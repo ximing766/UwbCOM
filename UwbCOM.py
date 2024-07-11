@@ -62,6 +62,7 @@ class SerialAssistant:
         self.blue_list = ['#4A90E2', '#4F95E2', '#549AE2', '#599FE2', '#5EA4E2', '#63A9E2', '#68AEE2', '#6DB3E2', '#72B8E2', '#77BDE2', '#7CC2E2', '#81C7E2', '#86CCE2', '#8BD1E2', '#90D6E2', '#95DBE2', '#9AE0E2', '#9FE5E2', '#A4EAE2', '#A9EFE2', '#AEF4E2', '#B3F9E2', '#B8FEE2', '#BDFFE2', '#C2FFE2']#, '#C7FFE2', '#CCFFE2', '#D1FFE2', '#D6FFE2', '#DBFFE2', '#E0FFE2', '#E5FFE2', '#EAFFE2', '#EFFFE2', '#F4FFE2']
         
         self.colorflag = 0
+        self.basicflag = 0
 
         # 应用颜色方案
         style = ttk.Style(self.master)
@@ -184,7 +185,7 @@ class SerialAssistant:
             # self.draw_thread = threading.Thread(target=self.draw_data)
             # self.draw_thread.start()
 
-            #self.text_box.insert(tk.END, "串口已打开\n")
+            self.text_box.insert(tk.END, "串口已打开\n")
             #messagebox.showinfo("tips","serial openning!")
 
         except Exception as e:
@@ -223,6 +224,7 @@ class SerialAssistant:
         self.serial.write(self.flag_str.encode())
         
     def show_cardData(self,data):
+        data = data.strip()
         if self.flag_str == "11111":
             cardNumber = data[210:320][:20]
             self.text_area1.delete('1.0', tk.END)
@@ -273,23 +275,28 @@ class SerialAssistant:
 
                     #卡片信息读取
                     if self.CardInfoChar in data:
-                        #self.text_box.insert(tk.END,str(data))
-                        #self.text_box.see(tk.END)
+                        # self.text_box.insert(tk.END,str(data))
+                        # print("receive card info.")
+                        #print(data)
+                        print(data)
+                        print("*******************")
+                        # self.text_box.see(tk.END)
                         self.show_cardData(data)                                            
                     
                     if self.UserInfo in data:               
                         #获取用户下标，更新该用户的距离数据
+                        
                         idx = int(data.split(':')[7].strip())   
                         self.distance_list[idx]['MasterDistance'] = int(data.split(':')[1].strip())
                         self.distance_list[idx]['SlaverDistance'] = int(data.split(':')[3].strip())
                         self.distance_list[idx]['GateDistance'] = int(data.split(':')[5].strip())
                         self.text_box.insert(tk.END, "用户" + str(idx) + ": " + str(self.distance_list[idx]['MasterDistance']) + "," + str(self.distance_list[idx]['SlaverDistance']) +","  \
                                              + str(self.distance_list[idx]['GateDistance']) + "(主,从,门)" + "\n")
-
                         self.text_box.see(tk.END)
                         
                         if self.Master2SlverDistance == 0:
                             self.Master2SlverDistance = self.distance_list[idx]['GateDistance']
+                            self.draw_basic();
                     
                         if self.distance_list[idx]['MasterDistance'] != 0 and self.distance_list[idx]['SlaverDistance'] != 0 and self.distance_list[idx]['GateDistance'] !=0:
                             #计算用户坐标
@@ -323,16 +330,15 @@ class SerialAssistant:
                                         
                                         #创建回归曲线模型，预测用户坐标位置
                                         self.predict_x,self.predict_y = self.predict_coor(self.distance_list[idx]['CoorX_Arr'],self.distance_list[idx]['CoorY_Arr'])
-                                        self.text_box.insert(tk.END, "预测用户" + str(idx) + "位置..." + "\n")
-                                        self.text_box.see(tk.END)
+                                        # self.text_box.insert(tk.END, "预测用户" + str(idx) + "位置..." + "\n")
+                                        # self.text_box.see(tk.END)
                                         
                                         #添加预测数据到数组末尾
                                         self.distance_list[idx]['CoorX_Arr'] = np.append(self.distance_list[idx]['CoorX_Arr'],self.predict_x)    
                                         self.distance_list[idx]['CoorY_Arr'] = np.append(self.distance_list[idx]['CoorY_Arr'],self.predict_y)
                                         
                                         #绘制用户坐标位置
-                                        self.text_box.insert(tk.END, "绘制用户" + str(idx) + "位置..." + "\n")
-                                        self.text_box.see(tk.END)
+                                        
                                         self.draw_user(self.distance_list,idx)  
 
                                         
@@ -362,7 +368,7 @@ class SerialAssistant:
         #self.canvas.delete("cor_y")
         #绘制用户(圆，需要动态变化)
         # 参数分别为：左上角坐标、右下角坐标
-        self.draw_basic()   #绘制完basic后需要将所有用户点都刷新一遍
+        #self.draw_basic()   #绘制完basic后需要将所有用户点都刷新一遍
         for i in range(20):
             if len(user[i]['CoorX_Arr']) > 0: 
                 self.canvas.create_oval(user[i]['CoorX_Arr'][-1]-5, user[i]['CoorY_Arr'][-1]-5, user[i]['CoorX_Arr'][-1]+5, user[i]['CoorY_Arr'][-1]+5, outline=colors[i], fill=colors[i],tags=("user" + str(i)))
@@ -372,42 +378,43 @@ class SerialAssistant:
         
     def draw_basic(self):
         
-        growth_and_decay_list = [i for i in range(25)] + [i for i in range(24, -1, -1)]
-        if self.init_draw == 1:
+        # growth_and_decay_list = [i for i in range(25)] + [i for i in range(24, -1, -1)]
+        # #if self.init_draw == 1:
 
-            self.colorflag = (self.colorflag + 1) % len(growth_and_decay_list) 
-            self.canvas.delete("blue_area")
-            self.canvas.delete("red_area")
-                
-            #blue area
-            self.canvas.create_rectangle(400-self.Master2SlverDistance/2, 60, 400+self.Master2SlverDistance/2, 60+150, width=1, \
-                                         outline=self.blue_list[growth_and_decay_list[self.colorflag]],fill=self.blue_list[growth_and_decay_list[self.colorflag]],tags = "blue_area")
-            #red area
-            self.canvas.create_arc(400-self.Master2SlverDistance/2, 60-self.Master2SlverDistance/2, 400+self.Master2SlverDistance/2, 60+self.Master2SlverDistance/2, start=180, extent=180, \
-                                         fill=self.red_list[growth_and_decay_list[self.colorflag]],outline=self.red_list[growth_and_decay_list[self.colorflag]],tags = "red_area")
+        # self.colorflag = (self.colorflag + 1) % len(growth_and_decay_list) 
+        # self.canvas.delete("blue_area")
+        # self.canvas.delete("red_area")
             
+        # #blue area
+        # self.canvas.create_rectangle(400-self.Master2SlverDistance/2, 60, 400+self.Master2SlverDistance/2, 60+150, width=1, \
+        #                              outline=self.blue_list[growth_and_decay_list[self.colorflag]],fill=self.blue_list[growth_and_decay_list[self.colorflag]],tags = "blue_area")
+        # #red area
+        # self.canvas.create_arc(400-self.Master2SlverDistance/2, 60-self.Master2SlverDistance/2, 400+self.Master2SlverDistance/2, 60+self.Master2SlverDistance/2, start=180, extent=180, \
+        #                              fill=self.red_list[growth_and_decay_list[self.colorflag]],outline=self.red_list[growth_and_decay_list[self.colorflag]],tags = "red_area")
+        
             
 
         
-        if self.init_draw == 0 and self.Master2SlverDistance != 0:         #基本形状只在开始绘制（可以用线程机制取消判断）
+        #if self.init_draw == 0 and self.Master2SlverDistance != 0:         #基本形状只在开始绘制（可以用线程机制取消判断）
             # 绘制闸机(left)  以400为x原点，右下角坐标:[400-self.Master2SlverDistance/2,60]  左上角坐标[(400-self.Master2SlverDistance/2-30),10]
             # 参数: 左上角x, 左上角y, 右下角x, 右下角y, 线宽, 线条颜色, 填充颜色
-            self.canvas.create_rectangle(400-self.Master2SlverDistance/2-30,10, 400-self.Master2SlverDistance/2, 60, width=1, outline="#6E6E6E", fill="#6E6E6E")
+        print(self.Master2SlverDistance)
+        self.canvas.create_rectangle(400-self.Master2SlverDistance/2-30,10, 400-self.Master2SlverDistance/2, 60, width=1, outline="#6E6E6E", fill="#6E6E6E")
 
-            # 绘制闸机(right) 以400为x原点，左上角坐标:[400+self.Master2SlverDistance/2,10]  右下角坐标:[(400+self.Master2SlverDistance/2+30),60]
-            # 参数: 左上角x, 左上角y, 右下角x, 右下角y, 线宽, 线条颜色, 填充颜色
-            self.canvas.create_rectangle(400+self.Master2SlverDistance/2, 10, 400+self.Master2SlverDistance/2+30, 60, width=1, outline="#6E6E6E", fill="#6E6E6E")
+        # 绘制闸机(right) 以400为x原点，左上角坐标:[400+self.Master2SlverDistance/2,10]  右下角坐标:[(400+self.Master2SlverDistance/2+30),60]
+        # 参数: 左上角x, 左上角y, 右下角x, 右下角y, 线宽, 线条颜色, 填充颜色
+        self.canvas.create_rectangle(400+self.Master2SlverDistance/2, 10, 400+self.Master2SlverDistance/2+30, 60, width=1, outline="#6E6E6E", fill="#6E6E6E")
 
-            # 绘制蓝区(矩形)   高度固定150
-            # 左上角坐标[400-self.Master2SlverDistance/2,60] 右下角坐标[400+self.Master2SlverDistance/2,60+150]
-            self.canvas.create_rectangle(400-self.Master2SlverDistance/2, 60, 400+self.Master2SlverDistance/2, 60+150, width=1, outline="#4A90E2", fill="#4A90E2")
+        # 绘制蓝区(矩形)   高度固定150
+        # 左上角坐标[400-self.Master2SlverDistance/2,60] 右下角坐标[400+self.Master2SlverDistance/2,60+150]
+        self.canvas.create_rectangle(400-self.Master2SlverDistance/2, 60, 400+self.Master2SlverDistance/2, 60+150, width=1, outline="#4A90E2", fill="#4A90E2")
 
-            # 绘制红区(半圆)  r=self.Master2SlverDistance/2  圆心(400,60)  
-            # 左上角坐标(400-self.Master2SlverDistance/2,60-self.Master2SlverDistance/2)
-            # 右下角坐标(400+self.Master2SlverDistance/2,60+self.Master2SlverDistance/2)
-            self.canvas.create_arc(400-self.Master2SlverDistance/2, 60-self.Master2SlverDistance/2, 400+self.Master2SlverDistance/2, 60+self.Master2SlverDistance/2, start=180, extent=180, fill='#FF6347',outline="#FF6347")
-            self.canvas.create_text(360,300,text="坐标:")
-            self.init_draw = 1
+        # 绘制红区(半圆)  r=self.Master2SlverDistance/2  圆心(400,60)  
+        # 左上角坐标(400-self.Master2SlverDistance/2,60-self.Master2SlverDistance/2)
+        # 右下角坐标(400+self.Master2SlverDistance/2,60+self.Master2SlverDistance/2)
+        self.canvas.create_arc(400-self.Master2SlverDistance/2, 60-self.Master2SlverDistance/2, 400+self.Master2SlverDistance/2, 60+self.Master2SlverDistance/2, start=180, extent=180, fill='#FF6347',outline="#FF6347")
+        #self.canvas.create_text(360,300,text="坐标:")
+        self.init_draw = 1
                     
 
     #处理坐标数组，输出预测坐标
