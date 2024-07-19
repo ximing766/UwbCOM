@@ -1,3 +1,4 @@
 /dist
 /build
-/UwbCOM_V1.1.spec
+/UwbCOM_*.spec
+/app
