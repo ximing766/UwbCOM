@@ -1,27 +1,35 @@
 # UwbCOM
+
 UWB串口助手
 
 # APP生成步骤
 
 1：需要进入myenv虚拟环境，否则没有相关包。
+
 2：执行
+
 pyinstaller --noconsole --onefile -i UWB.ico --name "UwbCOM" UwbCOM.py
 
 3：若失败，在生成的spec添加一行
+
 import sys ; sys.setrecursionlimit(sys.getrecursionlimit() * 5)
 
 4:使用下方命令安装
+
 pyinstaller UwbCOM.spec 
 
 注：此方法生成的exe文件很大，pyinstaller会将很多无关的库一起打包，解决方法为使用pipenv创建一个全新的虚拟环境，安装相关依赖包后，在pipenv中使用pyinstaller安装。
 
 # 简介
+
 UWB的串口GUI工具，显示用户位置
 
 # V1.1
+
 初始化版本，映射用户位置
 
 # V1.2
+
 1.添加了多设备设别（待UWB设备优化bug）
 
 2.添加了界面闪烁
