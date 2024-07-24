@@ -1,0 +1,5 @@
+<RCC>
+  <qresource prefix="GROUP_NAME">
+    <file>./bg.jpg</file>
+  </qresource>
+</RCC>

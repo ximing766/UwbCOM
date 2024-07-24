@@ -10,6 +10,8 @@ from tkinter.ttk  import *
 from ttkthemes import ThemedStyle
 import serial.tools.list_ports
 import math
+import sys
+import os
 from PIL import Image
 from PIL import ImageTk
 
@@ -24,7 +26,7 @@ class SerialAssistant:
         master.title("UwbCOM")
         self.master.minsize(800, 1)
 
-        self.serial = None
+        self.serial_ports = []
 
         # 设置串口参数
         self.port = "COM13"  
@@ -63,33 +65,29 @@ class SerialAssistant:
         self.blue_list = ['#4A90E2', '#4F95E2', '#549AE2', '#599FE2', '#5EA4E2', '#63A9E2', '#68AEE2', '#6DB3E2', '#72B8E2', '#77BDE2', '#7CC2E2', '#81C7E2', '#86CCE2', '#8BD1E2', '#90D6E2', '#95DBE2', '#9AE0E2', '#9FE5E2', '#A4EAE2', '#A9EFE2', '#AEF4E2', '#B3F9E2', '#B8FEE2', '#BDFFE2', '#C2FFE2']#, '#C7FFE2', '#CCFFE2', '#D1FFE2', '#D6FFE2', '#DBFFE2', '#E0FFE2', '#E5FFE2', '#EAFFE2', '#EFFFE2', '#F4FFE2']
         
         self.colorflag = 0
-
-        # self.master.geometry("850x850")
-        # self.master.iconbitmap("Uwb.ico")
-
-        # self.img = Image.open('bg.png')
-        # self.img = self.img.resize((850, 850),Image.ANTIALIAS)
-         
-        # self.img = self.img.convert("RGBA")  # 转换为支持透明度的格式
-        # # 创建透明度遮罩
-        # self.alpha = self.img.split()[3]
-        # # 调整透明度通道
-        # self.alpha = self.alpha.point(lambda i: i * 0.5)  # 将透明度调整为 50% 并转换为 0-255 范围
-        # # 应用透明度遮罩回到图片
-        # self.img.putalpha(self.alpha)
-        # # 将 PIL 图片转换为 Tkinter 可以使用的 PhotoImage
-        # self.tk_img = ImageTk.PhotoImage(self.img)
-        
+        self.master.geometry("850x850")
         
         # 创建界面
         self.create_widgets()
-        
-        
+
+        self.update_combobox_periodically()
+    
+    def get_serial_ports(self):
+        ports = serial.tools.list_ports.comports()
+        serial_ports = [port.device for port in ports]
+        return serial_ports
     
     def update_combobox(self):
         serial_ports = self.get_serial_ports()
-        if serial_ports is not None and len(serial_ports) > 0:
-            self.combo.current(0)
+        if serial_ports != self.serial_ports:
+            self.serial_ports = serial_ports
+            self.combo['values'] = self.serial_ports
+            if self.serial_ports:
+                self.combo.current(0)
+    
+    def update_combobox_periodically(self):
+        self.update_combobox()
+        self.master.after(1000, self.update_combobox_periodically)  # 每隔1秒调用一次
 
     def create_widgets(self):
         '''
@@ -126,8 +124,10 @@ class SerialAssistant:
         # ttk.Entry(frame_settings, textvariable=self.baudrate_var, width=10).grid(row=1, column=1, padx=5, pady=5,sticky='we')
         # self.baudrate_var.set(self.baudrate)
 
-        ttk.Button(frame_settings, text="打开串口", command=self.open_serial,style="TButton").grid(row=0, column=2, padx=5, pady=5,sticky='ns')
-        ttk.Button(frame_settings, text="关闭串口", command=self.close_serial,style="TButton").grid(row=1, column=2, padx=5, pady=5,sticky='ns')
+        self.open_bt = ttk.Button(frame_settings, text="打开串口", command=self.open_serial,style="TButton")
+        self.open_bt.grid(row=0, column=2, padx=5, pady=5,sticky='ns')
+        self.close_bt = ttk.Button(frame_settings, text="关闭串口", command=self.close_serial,style="TButton")
+        self.close_bt.grid(row=1, column=2, padx=5, pady=5,sticky='ns')
 
         card_Button = ttk.Button(frame_settings, text="卡号", command=lambda:self.send_data(11111),style="TButton").grid(row=0, column=4, padx=5, pady=5,sticky='ns')   #这块数据下行
         self.text_area1 = tk.Text(frame_settings, width=20, height=1)
@@ -197,8 +197,6 @@ class SerialAssistant:
         clear_button4 = ttk.Button(frame2, text="保存 2", command=lambda:self.clearAndSave_text(4),style="TButton",width=14)
         clear_button4.grid(row=0, column=6, padx=5, pady=1,sticky='nsew')
         
-
-
         '''
         description: 画布区域
         '''        
@@ -212,24 +210,15 @@ class SerialAssistant:
         #绘制画布边界
         #self.canvas.create_rectangle(0+2,0+2, 800-1, 400-1, width=1, outline="black")
         self.master.grid_columnconfigure(0, weight=1)
-        
-
-        
-        '''
-        description:bg画布
-        '''
-        # self.bg_canvas = tk.Canvas(self.master,height=850,width=850)
-        # self.bg_canvas.create_image(0,0,anchor="nw",image=self.tk_img)
-
-        # self.bg_canvas.place(x=0,y=0,relwidth=1,relheight=1)
-        # self.bg_canvas.lift("bg")
-
-
-        
-    def get_serial_ports(self):
-        ports = serial.tools.list_ports.comports()
-        serial_ports = [port.device for port in ports]
-        return serial_ports
+            
+    def change_button_style(self, style_type):
+        style = ttk.Style()
+        if style_type == "open":
+            self.open_bt.config(style="Opened.TButton",text="opened")
+            style.configure("Opened.TButton", background="green",relief="raised")
+        elif style_type == "default":
+            self.open_bt.config(style="TButton",text="打开串口")
+            style.configure("TButton", background="SystemButtonFace", foreground="SystemButtonText",relief="flat")
 
     def open_serial(self):
         try:
@@ -241,6 +230,7 @@ class SerialAssistant:
             # self.draw_thread.start()
 
             self.text_box.insert(tk.END, "串口已打开\n")
+            self.change_button_style("open")
             #messagebox.showinfo("tips","serial openning!")
 
         except Exception as e:
@@ -250,6 +240,7 @@ class SerialAssistant:
         if self.serial:
             self.serial.close()
             self.text_box.insert(tk.END, "串口已关闭\n")
+            self.change_button_style("default")
                                                  
     # 清空or保存文本框内容
     def clearAndSave_text(self,flag):
@@ -257,6 +248,10 @@ class SerialAssistant:
             self.text_box.delete(1.0, tk.END)
         elif flag == 2:
             self.text_box2.delete(1.0,tk.END)
+            self.text_area1.delete(1.0,tk.END)
+            self.text_area2.delete(1.0,tk.END)
+            self.text_area3.delete(1.0,tk.END)
+            self.text_area4.delete(1.0,tk.END)
         elif flag == 3:
             content = self.text_box.get("1.0",tk.END)
             print(content)
@@ -322,6 +317,7 @@ class SerialAssistant:
     def read_data(self):
         self.UserInfo = "@Qi"
         self.CardInfoChar = "1E006F";
+        
         while self.serial and self.serial.is_open:
             try:
                 data = self.serial.readline()
@@ -523,7 +519,7 @@ class SerialAssistant:
 
     # 显示关于对话框
     def show_about(self):
-        messagebox.showinfo("关于", "串口助手 v1.0\n\n"
+        messagebox.showinfo("关于", "UwbCOM v1.0\n\n"
                              "版权所有 © 2024 可为有限公司\n"
                              "Author: @QLL\n"
                              )
@@ -541,7 +537,7 @@ def main():
     # 添加一个关于按钮到主界面
     about_button = ttk.Button(root, text="关于", command=app.show_about,width=10,style="AboutButton.TButton")
     about_button.grid(row=4, column=0, padx=1, pady=1,sticky='n' )
-
+    #root.wm_iconphoto(True,tk.PhotoImage(file="UWB.png"))
     root.mainloop()
 
 if __name__ == "__main__":
