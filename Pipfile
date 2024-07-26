@@ -1,18 +1,11 @@
 [[source]]
-url = "https://pypi.tuna.tsinghua.edu.cn/simple/"
+url = "https://pypi.org/simple"
 verify_ssl = true
 name = "pypi"
 
 [packages]
-numpy = "*"
-ttkthemes = "*"
-serial = "*"
-scikit-learn = "*"
-pyserial = "*"
-pyinstaller = "*"
 
 [dev-packages]
 
 [requires]
-python_version = "3.8"
-python_full_version = "3.8.15"
+python_version = "3.8.19"
