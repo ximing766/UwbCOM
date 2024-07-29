@@ -240,6 +240,9 @@ class SerialAssistant:
         if self.serial:
             self.serial.close()
             self.text_box.insert(tk.END, "串口已关闭\n")
+
+            self.canvas.delete("all")    #清空画布
+            self.Master2SlverDistance = 0   #初始化闸间距,防止下次打开串口时，画图出错
             self.change_button_style("default")
                                                  
     # 清空or保存文本框内容
