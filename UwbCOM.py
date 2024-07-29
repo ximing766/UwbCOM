@@ -241,7 +241,7 @@ class SerialAssistant:
             self.serial.close()
             self.text_box.insert(tk.END, "串口已关闭\n")
 
-            self.canvas.delete("all")    #清空画布
+            self.canvas.delete("all")       #清空画布
             self.Master2SlverDistance = 0   #初始化闸间距,防止下次打开串口时，画图出错
             self.change_button_style("default")
                                                  
@@ -261,14 +261,14 @@ class SerialAssistant:
             filename = "Distance_content.txt";
             with open(filename,"w" ,encoding="utf-8") as file:
                 file.write(content)
-            messagebox.showinfo("tips","save success!");
+            messagebox.showinfo("tips","save file to root dir success!");
             
         elif flag == 4:
             content = self.text_box2.get(1.0,tk.END)
             filename = "Corr_content.csv";
             with open(filename,"w") as file:
                 file.write(content)
-            messagebox.showinfo("tips","save success!");
+            messagebox.showinfo("tips","save file to root dir success!");
     
     def send_data(self,flag):
         #content = self.text_area1.get("1.0", tk.END)
@@ -423,12 +423,14 @@ class SerialAssistant:
         #绘制用户(圆，需要动态变化)
         # 参数分别为：左上角坐标、右下角坐标
         #self.draw_basic()   #绘制完basic后需要将所有用户点都刷新一遍
-        for i in range(20):
-            if len(user[i]['CoorX_Arr']) > 0: 
-                self.canvas.create_oval(user[i]['CoorX_Arr'][-1]-5, user[i]['CoorY_Arr'][-1]-5, user[i]['CoorX_Arr'][-1]+5, user[i]['CoorY_Arr'][-1]+5, outline=colors[i], fill=colors[i],tags=("user" + str(i)))
+        # for i in range(20):
+        #     if len(user[i]['CoorX_Arr']) > 0: 
+        #         self.canvas.create_oval(user[i]['CoorX_Arr'][-1]-5, user[i]['CoorY_Arr'][-1]-5, user[i]['CoorX_Arr'][-1]+5, user[i]['CoorY_Arr'][-1]+5, outline=colors[i], fill=colors[i],tags=("user" + str(i)))
 
         #self.canvas.create_text(400,300,text="("+str(x)+",",tags="cor_x")
         #self.canvas.create_text(440,300,text=str(y)+")",tags="cor_y")
+        if len(user[idx]['CoorX_Arr']) > 0: 
+                self.canvas.create_oval(user[idx]['CoorX_Arr'][-1]-5, user[idx]['CoorY_Arr'][-1]-5, user[idx]['CoorX_Arr'][-1]+5, user[idx]['CoorY_Arr'][-1]+5, outline=colors[idx], fill=colors[idx],tags=("user" + str(idx)))
         
     def draw_basic(self):
         
