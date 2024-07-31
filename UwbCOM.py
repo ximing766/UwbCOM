@@ -1,13 +1,11 @@
 
 import tkinter as tk
-from tkinter import ttk
+import ttkbootstrap as ttk
 import serial
 import threading
 import time
 from tkinter import scrolledtext
 from tkinter import messagebox
-from tkinter.ttk  import *
-from ttkthemes import ThemedStyle
 import serial.tools.list_ports
 import math
 import sys
@@ -25,7 +23,6 @@ class SerialAssistant:
         self.master = master
         master.title("UwbCOM")
         self.master.minsize(800, 1)
-
         self.serial_ports = []
 
         # 设置串口参数
@@ -65,8 +62,8 @@ class SerialAssistant:
         self.blue_list = ['#4A90E2', '#4F95E2', '#549AE2', '#599FE2', '#5EA4E2', '#63A9E2', '#68AEE2', '#6DB3E2', '#72B8E2', '#77BDE2', '#7CC2E2', '#81C7E2', '#86CCE2', '#8BD1E2', '#90D6E2', '#95DBE2', '#9AE0E2', '#9FE5E2', '#A4EAE2', '#A9EFE2', '#AEF4E2', '#B3F9E2', '#B8FEE2', '#BDFFE2', '#C2FFE2']#, '#C7FFE2', '#CCFFE2', '#D1FFE2', '#D6FFE2', '#DBFFE2', '#E0FFE2', '#E5FFE2', '#EAFFE2', '#EFFFE2', '#F4FFE2']
         
         self.colorflag = 0
-        self.master.geometry("850x850")
-        
+        self.master.geometry("850x835")
+
         # 创建界面
         self.create_widgets()
 
@@ -93,7 +90,7 @@ class SerialAssistant:
         '''
         description: 串口设置区域
         '''        
-        frame_settings = ttk.LabelFrame(self.master, text="串口设置",style="TLabelframe")
+        frame_settings = ttk.LabelFrame(self.master, text="串口设置")
         frame_settings.grid(row=0, column=0, padx=5, pady=5,sticky='nsew')
         frame_settings.grid_columnconfigure(0, weight=1)
         frame_settings.grid_columnconfigure(1, weight=1)
@@ -102,51 +99,54 @@ class SerialAssistant:
         frame_settings.grid_columnconfigure(4, weight=1)
         frame_settings.grid_columnconfigure(5, weight=1)
 
-        ttk.Label(frame_settings, text="串口号:",background=self.bg_color).grid(row=0, column=0, padx=5, pady=5,sticky='w')
+        ttk.Label(frame_settings, text="COM:",bootstyle="danger").grid(row=0, column=0, padx=1, pady=5,sticky='w')
         self.port_var = tk.StringVar()
 
         self.combo = ttk.Combobox(frame_settings, values=self.get_serial_ports())
         self.update_combobox()
-        self.combo.grid(row=0, column=1, padx=5, pady=5,sticky='we')
+        self.combo.grid(row=0, column=1, padx=1, pady=5,sticky='we')
         
         # serial_port_menu = tk.OptionMenu(frame_settings, self.port_var, *self.get_serial_ports()).grid(row=0, column=1, padx=5, pady=5,sticky='we')
 
         # ttk.Entry(frame_settings, textvariable=self.port_var, width=10).grid(row=0, column=1, padx=5, pady=5,sticky='we')
         # self.port_var.set(self.port)
 
-        ttk.Label(frame_settings, text="波特率:",background=self.bg_color).grid(row=1, column=0, padx=5, pady=5,sticky='w')
+        ttk.Label(frame_settings, text="Baud:",bootstyle="danger").grid(row=1, column=0, padx=1, pady=5,sticky='w')
         self.baudrate_var = tk.IntVar()
         
         self.baudCombo = ttk.Combobox(frame_settings,values=['115200','9600','3000000'])
         self.baudCombo.current(0)
-        self.baudCombo.grid(row=1, column=1, padx=5, pady=5,sticky='we')
+        self.baudCombo.grid(row=1, column=1, padx=1, pady=5,sticky='we')
         
         # ttk.Entry(frame_settings, textvariable=self.baudrate_var, width=10).grid(row=1, column=1, padx=5, pady=5,sticky='we')
         # self.baudrate_var.set(self.baudrate)
 
-        self.open_bt = ttk.Button(frame_settings, text="打开串口", command=self.open_serial,style="TButton")
+        button_width = 8
+        entry_width = 20
+
+        self.open_bt = ttk.Button(frame_settings, text="打开串口", command=self.open_serial, width=button_width)#,bootstyle="info-outline")
         self.open_bt.grid(row=0, column=2, padx=5, pady=5,sticky='ns')
-        self.close_bt = ttk.Button(frame_settings, text="关闭串口", command=self.close_serial,style="TButton")
+        self.close_bt = ttk.Button(frame_settings, text="关闭串口", command=self.close_serial, width=button_width)#,bootstyle="info-outline")
         self.close_bt.grid(row=1, column=2, padx=5, pady=5,sticky='ns')
 
-        card_Button = ttk.Button(frame_settings, text="卡号", command=lambda:self.send_data(11111),style="TButton").grid(row=0, column=4, padx=5, pady=5,sticky='ns')   #这块数据下行
-        self.text_area1 = tk.Text(frame_settings, width=20, height=1)
+        card_Button = ttk.Button(frame_settings, text="卡  号", command=lambda:self.send_data(11111), width=button_width).grid(row=0, column=4, padx=5, pady=5,sticky='ns')   #这块数据下行
+        self.text_area1 = ttk.Entry(frame_settings,width=entry_width)#tk.Text(frame_settings, width=20, height=1)
         self.text_area1.grid(row=0, column=3, padx=5, pady=5, sticky='nsew')
         #card_Button.pack(side = tk.RIGHT,padx=5,pady=5)
         
-        other_Button = ttk.Button(frame_settings, text="有效期", command=lambda:self.send_data(22222),style="TButton").grid(row=1, column=4, padx=5, pady=5,sticky='ns')
+        other_Button = ttk.Button(frame_settings, text="有效期", command=lambda:self.send_data(22222), width=button_width).grid(row=1, column=4, padx=5, pady=5,sticky='ns')
         #other_Button.pack(side = tk.RIGHT,padx=5,pady=5)
-        self.text_area2 = tk.Text(frame_settings, width=20, height=1)
-        self.text_area2.grid(row=1, column=3, padx=5, pady=5, sticky='nsew')
+        self.text_area2 = ttk.Entry(frame_settings,width=entry_width)
+        self.text_area2.grid(row=1, column=3, padx=5, pady=5, sticky='nsew') 
         
-        other_Button1 = ttk.Button(frame_settings, text="余额", command=lambda:self.send_data(33333),style="TButton").grid(row=0, column=6, padx=5, pady=5,sticky='ns')
+        other_Button1 = ttk.Button(frame_settings, text="余  额", command=lambda:self.send_data(33333), width=button_width).grid(row=0, column=6, padx=5, pady=5,sticky='ns')
         #other_Button.pack(side = tk.RIGHT,padx=5,pady=5)
-        self.text_area3 = tk.Text(frame_settings, width=20, height=1)
-        self.text_area3.grid(row=0, column=5, padx=5, pady=5, sticky='nsew')
+        self.text_area3 = ttk.Entry(frame_settings,width=entry_width)
+        self.text_area3.grid(row=0, column=5, padx=5, pady=5, sticky='nsew') 
         
-        other_Button2 = ttk.Button(frame_settings, text="交易记录", command=lambda:self.send_data(44444),style="TButton").grid(row=1, column=6, padx=5, pady=5,sticky='ns')
+        other_Button2 = ttk.Button(frame_settings, text="交易记录", command=lambda:self.send_data(44444), width=button_width).grid(row=1, column=6, padx=5, pady=5,sticky='ns')
         #other_Button.pack(side = tk.RIGHT,padx=5,pady=5)
-        self.text_area4 = tk.Text(frame_settings, width=20, height=1)
+        self.text_area4 = ttk.Entry(frame_settings,width=entry_width)
         self.text_area4.grid(row=1, column=5, padx=5, pady=5, sticky='nsew')
         
 
@@ -155,7 +155,7 @@ class SerialAssistant:
         '''        
         
         # 创建一个标签框架
-        frame_comm = ttk.LabelFrame(self.master, text="通信区", style="TLabelframe")
+        frame_comm = ttk.LabelFrame(self.master, text="通信区")
         frame_comm.grid(row=1, column=0, padx=5, pady=5,sticky='nsew')
         frame_comm.grid_columnconfigure(0, weight=1)
         frame_comm.grid_columnconfigure(1, weight=1)
@@ -163,7 +163,7 @@ class SerialAssistant:
 
 
         # 创建第二个框架
-        frame2 = ttk.LabelFrame(self.master,style="TLabelframe")
+        frame2 = ttk.LabelFrame(self.master)
         frame2.grid(row=2, column=0, padx=5, pady=5,sticky='nsew')
         frame2.grid_columnconfigure(0, weight=1)
         frame2.grid_columnconfigure(2, weight=1)
@@ -173,52 +173,54 @@ class SerialAssistant:
         self.text_var = tk.StringVar()  # 存储文本数据的变量
         
         # 创建并放置第一个文本框
-        self.text_box = scrolledtext.ScrolledText(frame_comm, width=80, height=15)
+        self.text_box = scrolledtext.ScrolledText(frame_comm, width=80, height=12)
         self.text_box.grid(row=0, column=0, padx=5, pady=5,sticky='nsew')
 
         # 创建第二个文本框并放置在同一行
-        self.text_box2 = scrolledtext.ScrolledText(frame_comm, width=28, height=15)
+        self.text_box2 = scrolledtext.ScrolledText(frame_comm, width=28, height=12)
         self.text_box2.grid(row=0, column=1, padx=1, pady=1,sticky='nsew')
         
         
         # 创建并放置清除第一个文本框内容的按钮
-        clear_button = ttk.Button(frame2, text="清除 1", command=lambda:self.clearAndSave_text(1),style="TButton",width=40)
+        clear_button = ttk.Button(frame2, text="清除 1", command=lambda:self.clearAndSave_text(1),width=40)
         clear_button.grid(row=0, column=0, padx=5, pady=1,sticky='nsew')
 
         # 创建并放置清除第二个文本框内容的按钮
-        clear_button2 = ttk.Button(frame2, text="清除 2", command=lambda:self.clearAndSave_text(2),style="TButton",width=14)
+        clear_button2 = ttk.Button(frame2, text="清除 2", command=lambda:self.clearAndSave_text(2),width=14)
         clear_button2.grid(row=0, column=4, padx=5, pady=1,sticky='nsew')
         
         # 创建并放置清除第一个文本框内容的按钮
-        clear_button3 = ttk.Button(frame2, text="保存 1", command=lambda:self.clearAndSave_text(3),style="TButton",width=40)
+        clear_button3 = ttk.Button(frame2, text="保存 1", command=lambda:self.clearAndSave_text(3),width=40)
         clear_button3.grid(row=0, column=2, padx=5, pady=1,sticky='nsew')
 
         # 创建并放置清除第二个文本框内容的按钮
-        clear_button4 = ttk.Button(frame2, text="保存 2", command=lambda:self.clearAndSave_text(4),style="TButton",width=14)
+        clear_button4 = ttk.Button(frame2, text="保存 2", command=lambda:self.clearAndSave_text(4),width=14)
         clear_button4.grid(row=0, column=6, padx=5, pady=1,sticky='nsew')
         
         '''
         description: 画布区域
         '''        
-        frame_draw = ttk.LabelFrame(self.master,text = "画布区",style="TLabelframe")
+        frame_draw = ttk.LabelFrame(self.master,text = "画布区")
         frame_draw.grid(row=3, column=0, padx=5, pady=5,sticky='nsew')
         frame_draw.grid_columnconfigure(0, weight=1)
 
-        self.canvas = tk.Canvas(frame_draw,bg="white",height=400)
+        self.canvas = tk.Canvas(frame_draw,bg="white",height=350)
         self.canvas.grid(row=0, column=0, padx=5, pady=5,sticky='nsew')
 
         #绘制画布边界
         #self.canvas.create_rectangle(0+2,0+2, 800-1, 400-1, width=1, outline="black")
         self.master.grid_columnconfigure(0, weight=1)
+
+        '''
+        others
+        '''
             
     def change_button_style(self, style_type):
-        style = ttk.Style()
+        
         if style_type == "open":
-            self.open_bt.config(style="Opened.TButton",text="opened")
-            style.configure("Opened.TButton", background="green",relief="raised")
+            self.open_bt.config(text="opened")
         elif style_type == "default":
-            self.open_bt.config(style="TButton",text="打开串口")
-            style.configure("TButton", background="SystemButtonFace", foreground="SystemButtonText",relief="flat")
+            self.open_bt.config(text="打开串口")
 
     def open_serial(self):
         try:
@@ -251,10 +253,10 @@ class SerialAssistant:
             self.text_box.delete(1.0, tk.END)
         elif flag == 2:
             self.text_box2.delete(1.0,tk.END)
-            self.text_area1.delete(1.0,tk.END)
-            self.text_area2.delete(1.0,tk.END)
-            self.text_area3.delete(1.0,tk.END)
-            self.text_area4.delete(1.0,tk.END)
+            self.text_area1.delete(0,tk.END)
+            self.text_area2.delete(0,tk.END)
+            self.text_area3.delete(0,tk.END)
+            self.text_area4.delete(0,tk.END)
         elif flag == 3:
             content = self.text_box.get("1.0",tk.END)
             print(content)
@@ -271,7 +273,6 @@ class SerialAssistant:
             messagebox.showinfo("tips","save file to root dir success!");
     
     def send_data(self,flag):
-        #content = self.text_area1.get("1.0", tk.END)
         self.flag_str = str(flag)
         print("flag is :",self.flag_str)
         self.serial.write(self.flag_str.encode())
@@ -280,7 +281,8 @@ class SerialAssistant:
         data = data.strip()
         if self.flag_str == "11111":
             cardNumber = data[210:320][:20]
-            self.text_area1.delete('1.0', tk.END)
+            #self.text_area1.delete(tk.END)
+            self.text_area1.delete(0, tk.END)
             self.text_area1.insert(tk.END, cardNumber)     #卡号
             self.flag_str = ""
             
@@ -304,16 +306,16 @@ class SerialAssistant:
         
         else:    #没有点击事件仍然收到了MOT则为红区，显示所有信息
             cardNumber = data[210:320][:20]
-            self.text_area1.delete('1.0', tk.END)
+            self.text_area1.delete(0, tk.END)
             self.text_area1.insert(tk.END, cardNumber)     #卡号
-            validPeriod = data[210:320][20:36]
-            self.text_area2.delete('1.0', tk.END)
+            validPeriod = data[210:320][20:36]  
+            self.text_area2.delete(0, tk.END)
             self.text_area2.insert(tk.END, validPeriod)     #有效期
             balance = int(data[210:320][48:52],16)
-            self.text_area3.delete('1.0', tk.END)
+            self.text_area3.delete(0, tk.END)
             self.text_area3.insert(tk.END, str(balance / 100) + '￥')         #余额
             transactionRecord = data[210:320][92:106]
-            self.text_area4.delete('1.0', tk.END)
+            self.text_area4.delete(0, tk.END)
             self.text_area4.insert(tk.END, transactionRecord)       #交易记录
         
 
@@ -533,16 +535,30 @@ class SerialAssistant:
 
 def main():
     root = tk.Tk()
+    themes = ['cosmo', 'flatly', 'litera', 'minty', 'lumen', 'sandstone', 'yeti', 'pulse', 'united', 'morph', 'journal', 'darkly', 'superhero', 'solar', 'cyborg', 'vapor', 'simplex', 'cerculean']
+    style = ttk.Style("morph")    # "lumen" "minty" "sandstone"
+    # print(ttk.Style().theme_names())
     app = SerialAssistant(root)
-    style = ttk.Style()
-    style.configure("AboutButton.TButton", font=("Helvetica", 7))
-    ThemStyle = ThemedStyle(root)
-    print(ThemStyle.get_themes())
-    ThemStyle.set_theme("xpnative")
-    # 添加一个关于按钮到主界面
-    about_button = ttk.Button(root, text="关于", command=app.show_about,width=10,style="AboutButton.TButton")
-    about_button.grid(row=4, column=0, padx=1, pady=1,sticky='n' )
-    #root.wm_iconphoto(True,tk.PhotoImage(file="UWB.png"))
+
+    def change_theme(theme_name):
+        style.theme_use(theme_name)
+
+    # 创建菜单栏
+    menubar = tk.Menu(root)  
+    root.config(menu=menubar)
+    
+    # 创建主题菜单
+    theme_menu = tk.Menu(menubar, tearoff=0)
+    menubar.add_cascade(label="主题", menu=theme_menu) 
+    for theme in themes:
+        theme_menu.add_command(label=theme, command=lambda t=theme: change_theme(t))
+
+    # 创建关于菜单
+    about_menu = tk.Menu(menubar, tearoff=0)
+    menubar.add_cascade(label="关于", menu=about_menu)
+    about_menu.add_command(label="关于", command=app.show_about)
+
+    
     root.mainloop()
 
 if __name__ == "__main__":
