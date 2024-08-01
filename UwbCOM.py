@@ -39,7 +39,8 @@ class SerialAssistant:
             "SlaverDistance": 0,
             "CoorX_Arr": np.array([]),
             "CoorY_Arr": np.array([]),
-            "ZScoreFlag" : 0                    #Z-Score异常值处理标志,记录未经过Z-Score处理过的新坐标数量
+            "ZScoreFlag" : 0,                    #Z-Score异常值处理标志,记录未经过Z-Score处理过的新坐标数量
+            "nLos": 0                           #记录用户nLos次数   
         }
         
         self.distance_list = [self.initial_dict.copy() for _ in range(20)]
@@ -124,27 +125,27 @@ class SerialAssistant:
         button_width = 8
         entry_width = 20
 
-        self.open_bt = ttk.Button(frame_settings, text="打开串口", command=self.open_serial, width=button_width)#,bootstyle="info-outline")
+        self.open_bt = ttk.Button(frame_settings, text="打开串口", command=self.open_serial, width=button_width,bootstyle="primary")
         self.open_bt.grid(row=0, column=2, padx=5, pady=5,sticky='ns')
-        self.close_bt = ttk.Button(frame_settings, text="关闭串口", command=self.close_serial, width=button_width)#,bootstyle="info-outline")
+        self.close_bt = ttk.Button(frame_settings, text="关闭串口", command=self.close_serial, width=button_width,bootstyle="primary")
         self.close_bt.grid(row=1, column=2, padx=5, pady=5,sticky='ns')
 
-        card_Button = ttk.Button(frame_settings, text="卡  号", command=lambda:self.send_data(11111), width=button_width).grid(row=0, column=4, padx=5, pady=5,sticky='ns')   #这块数据下行
+        card_Button = ttk.Button(frame_settings, text="卡  号", command=lambda:self.send_data(11111), width=button_width,bootstyle="primary").grid(row=0, column=4, padx=5, pady=5,sticky='ns')   #这块数据下行
         self.text_area1 = ttk.Entry(frame_settings,width=entry_width)#tk.Text(frame_settings, width=20, height=1)
         self.text_area1.grid(row=0, column=3, padx=5, pady=5, sticky='nsew')
         #card_Button.pack(side = tk.RIGHT,padx=5,pady=5)
         
-        other_Button = ttk.Button(frame_settings, text="有效期", command=lambda:self.send_data(22222), width=button_width).grid(row=1, column=4, padx=5, pady=5,sticky='ns')
+        other_Button = ttk.Button(frame_settings, text="有效期", command=lambda:self.send_data(22222), width=button_width,bootstyle="primary").grid(row=1, column=4, padx=5, pady=5,sticky='ns')
         #other_Button.pack(side = tk.RIGHT,padx=5,pady=5)
         self.text_area2 = ttk.Entry(frame_settings,width=entry_width)
         self.text_area2.grid(row=1, column=3, padx=5, pady=5, sticky='nsew') 
         
-        other_Button1 = ttk.Button(frame_settings, text="余  额", command=lambda:self.send_data(33333), width=button_width).grid(row=0, column=6, padx=5, pady=5,sticky='ns')
+        other_Button1 = ttk.Button(frame_settings, text="余  额", command=lambda:self.send_data(33333), width=button_width,bootstyle="primary").grid(row=0, column=6, padx=5, pady=5,sticky='ns')
         #other_Button.pack(side = tk.RIGHT,padx=5,pady=5)
         self.text_area3 = ttk.Entry(frame_settings,width=entry_width)
         self.text_area3.grid(row=0, column=5, padx=5, pady=5, sticky='nsew') 
         
-        other_Button2 = ttk.Button(frame_settings, text="交易记录", command=lambda:self.send_data(44444), width=button_width).grid(row=1, column=6, padx=5, pady=5,sticky='ns')
+        other_Button2 = ttk.Button(frame_settings, text="交易记录", command=lambda:self.send_data(44444), width=button_width,bootstyle="primary").grid(row=1, column=6, padx=5, pady=5,sticky='ns')
         #other_Button.pack(side = tk.RIGHT,padx=5,pady=5)
         self.text_area4 = ttk.Entry(frame_settings,width=entry_width)
         self.text_area4.grid(row=1, column=5, padx=5, pady=5, sticky='nsew')
@@ -182,19 +183,19 @@ class SerialAssistant:
         
         
         # 创建并放置清除第一个文本框内容的按钮
-        clear_button = ttk.Button(frame2, text="清除 1", command=lambda:self.clearAndSave_text(1),width=40)
+        clear_button = ttk.Button(frame2, text="清除 1", command=lambda:self.clearAndSave_text(1),width=40,bootstyle="info-outline")
         clear_button.grid(row=0, column=0, padx=5, pady=1,sticky='nsew')
 
         # 创建并放置清除第二个文本框内容的按钮
-        clear_button2 = ttk.Button(frame2, text="清除 2", command=lambda:self.clearAndSave_text(2),width=14)
+        clear_button2 = ttk.Button(frame2, text="清除 2", command=lambda:self.clearAndSave_text(2),width=14,bootstyle="info-outline")
         clear_button2.grid(row=0, column=4, padx=5, pady=1,sticky='nsew')
         
         # 创建并放置清除第一个文本框内容的按钮
-        clear_button3 = ttk.Button(frame2, text="保存 1", command=lambda:self.clearAndSave_text(3),width=40)
+        clear_button3 = ttk.Button(frame2, text="保存 1", command=lambda:self.clearAndSave_text(3),width=40,bootstyle="info-outline")
         clear_button3.grid(row=0, column=2, padx=5, pady=1,sticky='nsew')
 
         # 创建并放置清除第二个文本框内容的按钮
-        clear_button4 = ttk.Button(frame2, text="保存 2", command=lambda:self.clearAndSave_text(4),width=14)
+        clear_button4 = ttk.Button(frame2, text="保存 2", command=lambda:self.clearAndSave_text(4),width=14,bootstyle="info-outline")
         clear_button4.grid(row=0, column=6, padx=5, pady=1,sticky='nsew')
         
         '''
@@ -218,9 +219,9 @@ class SerialAssistant:
     def change_button_style(self, style_type):
         
         if style_type == "open":
-            self.open_bt.config(text="opened")
+            self.open_bt.config(text="opened",bootstyle="success-outline")
         elif style_type == "default":
-            self.open_bt.config(text="打开串口")
+            self.open_bt.config(text="打开串口",bootstyle="primary")
 
     def open_serial(self):
         try:
@@ -342,12 +343,14 @@ class SerialAssistant:
                     if self.UserInfo in data:               
                         #获取用户下标，更新该用户的距离数据
                         
-                        idx = int(data.split(':')[7].strip())   
+                        idx = int(data.split(':')[9].strip())   
                         self.distance_list[idx]['MasterDistance'] = int(data.split(':')[1].strip())
                         self.distance_list[idx]['SlaverDistance'] = int(data.split(':')[3].strip())
                         self.distance_list[idx]['GateDistance'] = int(data.split(':')[5].strip())
-                        self.text_box.insert(tk.END, "用户" + str(idx) + ": " + str(self.distance_list[idx]['MasterDistance']) + "," + str(self.distance_list[idx]['SlaverDistance']) +","  \
-                                             + str(self.distance_list[idx]['GateDistance']) + "(主,从,门)" + "\n")
+                        self.distance_list[idx]['nLos'] = int(data.split(':')[7].strip())
+
+                        self.text_box.insert(tk.END, "用户" + str(idx) + "  |  " + "nLos <1-遮挡>:" + str(self.distance_list[idx]['nLos']) +  "  |  " +"主,从,门<距离>:" + str(self.distance_list[idx]['MasterDistance']) + "," + str(self.distance_list[idx]['SlaverDistance']) +","  \
+                                             + str(self.distance_list[idx]['GateDistance']) +  "\n")
                         self.text_box.see(tk.END)
                         
                         if self.Master2SlverDistance == 0:
@@ -536,7 +539,7 @@ class SerialAssistant:
 def main():
     root = tk.Tk()
     themes = ['cosmo', 'flatly', 'litera', 'minty', 'lumen', 'sandstone', 'yeti', 'pulse', 'united', 'morph', 'journal', 'darkly', 'superhero', 'solar', 'cyborg', 'vapor', 'simplex', 'cerculean']
-    style = ttk.Style("morph")    # "lumen" "minty" "sandstone"
+    style = ttk.Style("minty")    # "lumen" "minty" "sandstone"
     # print(ttk.Style().theme_names())
     app = SerialAssistant(root)
 
