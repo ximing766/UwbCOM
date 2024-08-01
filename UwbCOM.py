@@ -63,7 +63,7 @@ class SerialAssistant:
         self.blue_list = ['#4A90E2', '#4F95E2', '#549AE2', '#599FE2', '#5EA4E2', '#63A9E2', '#68AEE2', '#6DB3E2', '#72B8E2', '#77BDE2', '#7CC2E2', '#81C7E2', '#86CCE2', '#8BD1E2', '#90D6E2', '#95DBE2', '#9AE0E2', '#9FE5E2', '#A4EAE2', '#A9EFE2', '#AEF4E2', '#B3F9E2', '#B8FEE2', '#BDFFE2', '#C2FFE2']#, '#C7FFE2', '#CCFFE2', '#D1FFE2', '#D6FFE2', '#DBFFE2', '#E0FFE2', '#E5FFE2', '#EAFFE2', '#EFFFE2', '#F4FFE2']
         
         self.colorflag = 0
-        self.master.geometry("850x835")
+        self.master.geometry("850x800")
 
         # 创建界面
         self.create_widgets()
@@ -91,7 +91,7 @@ class SerialAssistant:
         '''
         description: 串口设置区域
         '''        
-        frame_settings = ttk.LabelFrame(self.master, text="串口设置")
+        frame_settings = ttk.LabelFrame(self.master, text="串口设置",bootstyle="info")
         frame_settings.grid(row=0, column=0, padx=5, pady=5,sticky='nsew')
         frame_settings.grid_columnconfigure(0, weight=1)
         frame_settings.grid_columnconfigure(1, weight=1)
@@ -156,56 +156,56 @@ class SerialAssistant:
         '''        
         
         # 创建一个标签框架
-        frame_comm = ttk.LabelFrame(self.master, text="通信区")
+        frame_comm = ttk.LabelFrame(self.master, text="通信区",bootstyle="info")
         frame_comm.grid(row=1, column=0, padx=5, pady=5,sticky='nsew')
         frame_comm.grid_columnconfigure(0, weight=1)
         frame_comm.grid_columnconfigure(1, weight=1)
-        frame_comm.grid_rowconfigure(0,weight=1)
-
-
-        # 创建第二个框架
-        frame2 = ttk.LabelFrame(self.master)
-        frame2.grid(row=2, column=0, padx=5, pady=5,sticky='nsew')
-        frame2.grid_columnconfigure(0, weight=1)
-        frame2.grid_columnconfigure(2, weight=1)
-        frame2.grid_columnconfigure(4, weight=1)
-        frame2.grid_columnconfigure(6, weight=1)
+        frame_comm.grid_columnconfigure(2, weight=1)
         
         self.text_var = tk.StringVar()  # 存储文本数据的变量
         
         # 创建并放置第一个文本框
         self.text_box = scrolledtext.ScrolledText(frame_comm, width=80, height=12)
-        self.text_box.grid(row=0, column=0, padx=5, pady=5,sticky='nsew')
+        self.text_box.grid(row=0, column=0, padx=1, pady=1,sticky='nsew')
 
         # 创建第二个文本框并放置在同一行
         self.text_box2 = scrolledtext.ScrolledText(frame_comm, width=28, height=12)
         self.text_box2.grid(row=0, column=1, padx=1, pady=1,sticky='nsew')
         
-        
+        frame2Width = 10
+        # 创建第二个框架
+        frame2 = ttk.Frame(frame_comm, width=frame2Width, height=12)
+        frame2.grid(row=0, column=2, padx=1, pady=1,sticky='nsew')
+        frame2.grid_rowconfigure(0,weight=1)
+        frame2.grid_rowconfigure(1,weight=1)
+        frame2.grid_rowconfigure(2,weight=1)
+        frame2.grid_rowconfigure(3,weight=1)
+        frame2.grid_columnconfigure(0, weight=1)
+
         # 创建并放置清除第一个文本框内容的按钮
-        clear_button = ttk.Button(frame2, text="清除 1", command=lambda:self.clearAndSave_text(1),width=40,bootstyle="info-outline")
-        clear_button.grid(row=0, column=0, padx=5, pady=1,sticky='nsew')
+        clear_button = ttk.Button(frame2, text="清除 1", command=lambda:self.clearAndSave_text(1),width=frame2Width,bootstyle="info")
+        clear_button.grid(row=0, column=0, padx=1, pady=1,sticky='nsew')
 
         # 创建并放置清除第二个文本框内容的按钮
-        clear_button2 = ttk.Button(frame2, text="清除 2", command=lambda:self.clearAndSave_text(2),width=14,bootstyle="info-outline")
-        clear_button2.grid(row=0, column=4, padx=5, pady=1,sticky='nsew')
+        clear_button2 = ttk.Button(frame2, text="清除 2", command=lambda:self.clearAndSave_text(2),width=frame2Width,bootstyle="info")
+        clear_button2.grid(row=1, column=0, padx=1, pady=1,sticky='nsew')
         
         # 创建并放置清除第一个文本框内容的按钮
-        clear_button3 = ttk.Button(frame2, text="保存 1", command=lambda:self.clearAndSave_text(3),width=40,bootstyle="info-outline")
-        clear_button3.grid(row=0, column=2, padx=5, pady=1,sticky='nsew')
+        clear_button3 = ttk.Button(frame2, text="保存 1", command=lambda:self.clearAndSave_text(3),width=frame2Width,bootstyle="info")
+        clear_button3.grid(row=2, column=0, padx=1, pady=1,sticky='nsew')
 
         # 创建并放置清除第二个文本框内容的按钮
-        clear_button4 = ttk.Button(frame2, text="保存 2", command=lambda:self.clearAndSave_text(4),width=14,bootstyle="info-outline")
-        clear_button4.grid(row=0, column=6, padx=5, pady=1,sticky='nsew')
+        clear_button4 = ttk.Button(frame2, text="保存 2", command=lambda:self.clearAndSave_text(4),width=frame2Width,bootstyle="info")
+        clear_button4.grid(row=3, column=0, padx=1, pady=1,sticky='nsew')
         
         '''
         description: 画布区域
         '''        
-        frame_draw = ttk.LabelFrame(self.master,text = "画布区")
+        frame_draw = ttk.LabelFrame(self.master,text = "画布区",bootstyle="info")
         frame_draw.grid(row=3, column=0, padx=5, pady=5,sticky='nsew')
         frame_draw.grid_columnconfigure(0, weight=1)
 
-        self.canvas = tk.Canvas(frame_draw,bg="white",height=350)
+        self.canvas = tk.Canvas(frame_draw,bg="white",height=400)
         self.canvas.grid(row=0, column=0, padx=5, pady=5,sticky='nsew')
 
         #绘制画布边界
@@ -349,8 +349,8 @@ class SerialAssistant:
                         self.distance_list[idx]['GateDistance'] = int(data.split(':')[5].strip())
                         self.distance_list[idx]['nLos'] = int(data.split(':')[7].strip())
 
-                        self.text_box.insert(tk.END, "用户" + str(idx) + "  |  " + "nLos <1-遮挡>:" + str(self.distance_list[idx]['nLos']) +  "  |  " +"主,从,门<距离>:" + str(self.distance_list[idx]['MasterDistance']) + "," + str(self.distance_list[idx]['SlaverDistance']) +","  \
-                                             + str(self.distance_list[idx]['GateDistance']) +  "\n")
+                        self.text_box.insert(tk.END, "用户 " + str(idx) + "  |  " + "nLos: " + str(self.distance_list[idx]['nLos']) + " <1-遮挡>" +  "  |  " +"主,从,门:  " + str(self.distance_list[idx]['MasterDistance']) + " ," + str(self.distance_list[idx]['SlaverDistance']) +" ,"  \
+                                             + str(self.distance_list[idx]['GateDistance']) + " <cm>" + "\n")
                         self.text_box.see(tk.END)
                         
                         if self.Master2SlverDistance == 0:
