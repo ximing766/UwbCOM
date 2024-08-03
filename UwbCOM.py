@@ -12,11 +12,11 @@ import sys
 import os
 from PIL import Image
 from PIL import ImageTk
-
 from sklearn.linear_model import LinearRegression
 from sklearn.preprocessing import PolynomialFeatures
 from sklearn.linear_model import ElasticNet
 import numpy as np
+from lift_uwb_dynamic_detect_plan import UWBLiftAnimationPlan1,UWBLiftAnimationPlan2
 
 class SerialAssistant:
     def __init__(self, master):
@@ -184,6 +184,7 @@ class SerialAssistant:
         frame2.grid_rowconfigure(1,weight=1)
         frame2.grid_rowconfigure(2,weight=1)
         frame2.grid_rowconfigure(3,weight=1)
+        frame2.grid_rowconfigure(4,weight=1)
         frame2.grid_columnconfigure(0, weight=1)
 
         # 创建并放置清除第一个文本框内容的按钮
@@ -201,7 +202,12 @@ class SerialAssistant:
         # 创建并放置清除第二个文本框内容的按钮
         clear_button4 = ttk.Button(frame2, text="保存 2", command=lambda:self.clearAndSave_text(4),width=frame2Width,bootstyle="info")
         clear_button4.grid(row=3, column=0, padx=1, pady=1,sticky='nsew')
+
+        animation_button1 = ttk.Button(frame2, text="演示 1", command=self.run_UWB_Animation_plan1, width=frame2Width,bootstyle="info")
+        animation_button1.grid(row=4, column=0, padx=1, pady=1,sticky='nsew')
         
+        animation_button2 = ttk.Button(frame2, text="演示 2", command=self.run_UWB_Animation_plan2, width=frame2Width,bootstyle="info")
+        animation_button2.grid(row=5, column=0, padx=1, pady=1,sticky='nsew')
         '''
         description: 画布区域
         '''        
@@ -524,7 +530,12 @@ class SerialAssistant:
                              "Author: @QLL\n"
                              )
             
-            
+    def run_UWB_Animation_plan1(self):
+        uwb_animation = UWBLiftAnimationPlan1()
+        uwb_animation.start_animation()
+    def run_UWB_Animation_plan2(self):
+        uwb_animation = UWBLiftAnimationPlan2()
+        uwb_animation.start_animation()
 
 def main():
     root = tk.Tk()
