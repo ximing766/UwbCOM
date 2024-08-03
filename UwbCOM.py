@@ -28,6 +28,7 @@ class SerialAssistant:
         # 设置串口参数
         self.port = "COM13"  
         self.baudrate = 115200
+        self.serial_open = False
 
         self.bytesize = serial.EIGHTBITS        # 数据位
         self.parity = serial.PARITY_NONE        # 校验位
@@ -103,7 +104,7 @@ class SerialAssistant:
         ttk.Label(frame_settings, text="COM:",bootstyle="danger").grid(row=0, column=0, padx=1, pady=5,sticky='w')
         self.port_var = tk.StringVar()
 
-        self.combo = ttk.Combobox(frame_settings, values=self.get_serial_ports())
+        self.combo = ttk.Combobox(frame_settings, values=self.get_serial_ports(),bootstyle="primary")
         self.update_combobox()
         self.combo.grid(row=0, column=1, padx=1, pady=5,sticky='we')
         
@@ -115,7 +116,7 @@ class SerialAssistant:
         ttk.Label(frame_settings, text="Baud:",bootstyle="danger").grid(row=1, column=0, padx=1, pady=5,sticky='w')
         self.baudrate_var = tk.IntVar()
         
-        self.baudCombo = ttk.Combobox(frame_settings,values=['115200','9600','3000000'])
+        self.baudCombo = ttk.Combobox(frame_settings,values=['115200','9600','3000000'],bootstyle="primary")
         self.baudCombo.current(0)
         self.baudCombo.grid(row=1, column=1, padx=1, pady=5,sticky='we')
         
@@ -125,29 +126,32 @@ class SerialAssistant:
         button_width = 8
         entry_width = 20
 
-        self.open_bt = ttk.Button(frame_settings, text="打开串口", command=self.open_serial, width=button_width,bootstyle="primary")
-        self.open_bt.grid(row=0, column=2, padx=5, pady=5,sticky='ns')
-        self.close_bt = ttk.Button(frame_settings, text="关闭串口", command=self.close_serial, width=button_width,bootstyle="primary")
-        self.close_bt.grid(row=1, column=2, padx=5, pady=5,sticky='ns')
+        self.serial_bt = ttk.Button(frame_settings, text="打开串口", command=self.open_serial, width=button_width,bootstyle="primary")
+        self.serial_bt.grid(row=0, column=2, padx=5, pady=5,sticky='ns')
+
+        self.modeCombo = ttk.Combobox(frame_settings,values=['GATE','LIFT'],width=button_width,bootstyle="primary")
+        self.modeCombo.current(0)
+        self.modeCombo.grid(row=1, column=2, padx=5, pady=5,sticky='ns')
+        self.modeCombo.bind("<<ComboboxSelected>>", self.on_mode_change)
 
         card_Button = ttk.Button(frame_settings, text="卡  号", command=lambda:self.send_data(11111), width=button_width,bootstyle="primary").grid(row=0, column=4, padx=5, pady=5,sticky='ns')   #这块数据下行
-        self.text_area1 = ttk.Entry(frame_settings,width=entry_width)#tk.Text(frame_settings, width=20, height=1)
+        self.text_area1 = ttk.Entry(frame_settings,width=entry_width,bootstyle="info")#tk.Text(frame_settings, width=20, height=1)
         self.text_area1.grid(row=0, column=3, padx=5, pady=5, sticky='nsew')
         #card_Button.pack(side = tk.RIGHT,padx=5,pady=5)
         
         other_Button = ttk.Button(frame_settings, text="有效期", command=lambda:self.send_data(22222), width=button_width,bootstyle="primary").grid(row=1, column=4, padx=5, pady=5,sticky='ns')
         #other_Button.pack(side = tk.RIGHT,padx=5,pady=5)
-        self.text_area2 = ttk.Entry(frame_settings,width=entry_width)
+        self.text_area2 = ttk.Entry(frame_settings,width=entry_width,bootstyle="info")
         self.text_area2.grid(row=1, column=3, padx=5, pady=5, sticky='nsew') 
         
         other_Button1 = ttk.Button(frame_settings, text="余  额", command=lambda:self.send_data(33333), width=button_width,bootstyle="primary").grid(row=0, column=6, padx=5, pady=5,sticky='ns')
         #other_Button.pack(side = tk.RIGHT,padx=5,pady=5)
-        self.text_area3 = ttk.Entry(frame_settings,width=entry_width)
+        self.text_area3 = ttk.Entry(frame_settings,width=entry_width,bootstyle="info")
         self.text_area3.grid(row=0, column=5, padx=5, pady=5, sticky='nsew') 
         
         other_Button2 = ttk.Button(frame_settings, text="交易记录", command=lambda:self.send_data(44444), width=button_width,bootstyle="primary").grid(row=1, column=6, padx=5, pady=5,sticky='ns')
         #other_Button.pack(side = tk.RIGHT,padx=5,pady=5)
-        self.text_area4 = ttk.Entry(frame_settings,width=entry_width)
+        self.text_area4 = ttk.Entry(frame_settings,width=entry_width,bootstyle="info")
         self.text_area4.grid(row=1, column=5, padx=5, pady=5, sticky='nsew')
         
 
@@ -215,26 +219,21 @@ class SerialAssistant:
         '''
         others
         '''
-            
-    def change_button_style(self, style_type):
-        
-        if style_type == "open":
-            self.open_bt.config(text="opened",bootstyle="success-outline")
-        elif style_type == "default":
-            self.open_bt.config(text="打开串口",bootstyle="primary")
+
+    def update_serial_button(self):
+        if self.serial_open:
+            self.serial_bt.config(text="关闭串口", command=self.close_serial,bootstyle="danger-outline")
+        else:
+            self.serial_bt.config(text="打开串口", command=self.open_serial,bootstyle="primary")
+
 
     def open_serial(self):
         try:
             self.serial = serial.Serial(self.combo.get(), self.baudCombo.get(), timeout=1)
             self.read_thread = threading.Thread(target=self.read_data)
             self.read_thread.start()
-
-            # self.draw_thread = threading.Thread(target=self.draw_data)
-            # self.draw_thread.start()
-
-            self.text_box.insert(tk.END, "串口已打开\n")
-            self.change_button_style("open")
-            #messagebox.showinfo("tips","serial openning!")
+            self.serial_open = True
+            self.update_serial_button()
 
         except Exception as e:
             self.text_box.insert(tk.END, f"打开串口失败: {e}\n")
@@ -246,7 +245,8 @@ class SerialAssistant:
 
             self.canvas.delete("all")       #清空画布
             self.Master2SlverDistance = 0   #初始化闸间距,防止下次打开串口时，画图出错
-            self.change_button_style("default")
+            self.serial_open = False
+            self.update_serial_button()
                                                  
     # 清空or保存文本框内容
     def clearAndSave_text(self,flag):
@@ -355,15 +355,20 @@ class SerialAssistant:
                         
                         if self.Master2SlverDistance == 0:
                             self.Master2SlverDistance = self.distance_list[idx]['GateDistance']
-                            self.draw_basic();
+                            self.on_mode_change()
                     
                         if self.distance_list[idx]['MasterDistance'] != 0 and self.distance_list[idx]['SlaverDistance'] != 0 and self.distance_list[idx]['GateDistance'] !=0:
                             #计算用户坐标
                             self.x = 400 + int(((self.distance_list[idx]['SlaverDistance']**2 - self.distance_list[idx]['MasterDistance']**2) / (2*self.distance_list[idx]['GateDistance'])))
                             #异常值去除，防止开到负根
                             if abs(self.distance_list[idx]['MasterDistance']**2 - (self.x - (400 + self.distance_list[idx]['GateDistance']/2))**2) > 0:
-                                self.y = 60 + int(math.sqrt(abs(self.distance_list[idx]['MasterDistance']**2 - (self.x - (400 + self.distance_list[idx]['GateDistance']/2))**2)))
-                                self.text_box2.insert(tk.END,str(idx) + "," + str(self.x) + "," + str(self.y) + "\n")
+                                self.y = int(math.sqrt(abs(self.distance_list[idx]['MasterDistance']**2 - (self.x - (400 + self.distance_list[idx]['GateDistance']/2))**2)))
+                                # Lift模式下，进行坐标映射
+                                if self.modeCombo.get() == "LIFT":
+                                    print("LIFT模式下,进行坐标映射")
+                                    self.y = math.sqrt(abs(self.y**2 - 35*35))  
+                                self.y = self.y + 60 
+                                self.text_box2.insert(tk.END,f"{idx} , {self.x-400:.0f} , {self.y-60:.0f}\n")
                                 self.text_box2.see(tk.END)
                                 
                                 self.distance_list[idx]['ZScoreFlag'] += 1
@@ -412,7 +417,7 @@ class SerialAssistant:
                                 else:
                                     pass
                             else:
-                                print("距离数据有误，计算出Y为负数")
+                                print("距离数据有误,计算出Y为负数")
             except serial.SerialException:
                 self.text_box.insert(tk.END, "串口连接已断开\n")
                 break
@@ -438,46 +443,31 @@ class SerialAssistant:
                 self.canvas.create_oval(user[idx]['CoorX_Arr'][-1]-5, user[idx]['CoorY_Arr'][-1]-5, user[idx]['CoorX_Arr'][-1]+5, user[idx]['CoorY_Arr'][-1]+5, outline=colors[idx], fill=colors[idx],tags=("user" + str(idx)))
         
     def draw_basic(self):
-        
-        # growth_and_decay_list = [i for i in range(25)] + [i for i in range(24, -1, -1)]
-        # #if self.init_draw == 1:
-
-        # self.colorflag = (self.colorflag + 1) % len(growth_and_decay_list) 
-        #
-        # self.canvas.delete("blue_area")
-        # self.canvas.delete("red_area")
-            
-        # #blue area
-        # self.canvas.create_rectangle(400-self.Master2SlverDistance/2, 60, 400+self.Master2SlverDistance/2, 60+150, width=1, \
-        #                              outline=self.blue_list[growth_and_decay_list[self.colorflag]],fill=self.blue_list[growth_and_decay_list[self.colorflag]],tags = "blue_area")
-        # #red area
-        # self.canvas.create_arc(400-self.Master2SlverDistance/2, 60-self.Master2SlverDistance/2, 400+self.Master2SlverDistance/2, 60+self.Master2SlverDistance/2, start=180, extent=180, \
-        #                              fill=self.red_list[growth_and_decay_list[self.colorflag]],outline=self.red_list[growth_and_decay_list[self.colorflag]],tags = "red_area")
-        
-            
-
-        
-        #if self.init_draw == 0 and self.Master2SlverDistance != 0:         #基本形状只在开始绘制（可以用线程机制取消判断）
-            # 绘制闸机(left)  以400为x原点，右下角坐标:[400-self.Master2SlverDistance/2,60]  左上角坐标[(400-self.Master2SlverDistance/2-30),10]
-            # 参数: 左上角x, 左上角y, 右下角x, 右下角y, 线宽, 线条颜色, 填充颜色
-        print(self.Master2SlverDistance)
+        self.canvas.delete("all")
+        # 绘制闸机(left)  以400为x原点，右下角坐标:[400-self.Master2SlverDistance/2,60]  左上角坐标[(400-self.Master2SlverDistance/2-30),10]
+        # 参数: 左上角x, 左上角y, 右下角x, 右下角y, 线宽, 线条颜色, 填充颜色
         self.canvas.create_rectangle(400-self.Master2SlverDistance/2-30,10, 400-self.Master2SlverDistance/2, 60, width=1, outline="#6E6E6E", fill="#6E6E6E")
 
         # 绘制闸机(right) 以400为x原点，左上角坐标:[400+self.Master2SlverDistance/2,10]  右下角坐标:[(400+self.Master2SlverDistance/2+30),60]
         # 参数: 左上角x, 左上角y, 右下角x, 右下角y, 线宽, 线条颜色, 填充颜色
         self.canvas.create_rectangle(400+self.Master2SlverDistance/2, 10, 400+self.Master2SlverDistance/2+30, 60, width=1, outline="#6E6E6E", fill="#6E6E6E")
 
+        selected_mode = self.modeCombo.get()
+        if selected_mode == "GATE":
         # 绘制蓝区(矩形)   高度固定150
         # 左上角坐标[400-self.Master2SlverDistance/2,60] 右下角坐标[400+self.Master2SlverDistance/2,60+150]
-        self.canvas.create_rectangle(400-self.Master2SlverDistance/2, 60, 400+self.Master2SlverDistance/2, 60+150, width=1, outline="#4A90E2", fill="#4A90E2")
+            self.canvas.create_rectangle(400-self.Master2SlverDistance/2, 60, 400+self.Master2SlverDistance/2, 60+150, width=1, outline="#4A90E2", fill="#4A90E2")
 
         # 绘制红区(半圆)  r=self.Master2SlverDistance/2  圆心(400,60)  
         # 左上角坐标(400-self.Master2SlverDistance/2,60-self.Master2SlverDistance/2)
         # 右下角坐标(400+self.Master2SlverDistance/2,60+self.Master2SlverDistance/2)
-        self.canvas.create_arc(400-self.Master2SlverDistance/2, 60-self.Master2SlverDistance/2, 400+self.Master2SlverDistance/2, 60+self.Master2SlverDistance/2, start=180, extent=180, fill='#FF6347',outline="#FF6347")
+            self.canvas.create_arc(400-self.Master2SlverDistance/2, 60-self.Master2SlverDistance/2, 400+self.Master2SlverDistance/2, 60+self.Master2SlverDistance/2, start=180, extent=180, fill='#FF6347',outline="#FF6347")
         #self.canvas.create_text(360,300,text="坐标:")
+        elif selected_mode == 'LIFT':
+            self.canvas.create_rectangle(400-self.Master2SlverDistance/2, 60, 400+self.Master2SlverDistance/2, 60+55, width=1, outline="#4A90E2", fill="#4A90E2")
         self.init_draw = 1
-                    
+    def on_mode_change(self,event=None):
+        self.draw_basic();              
 
     #处理坐标数组，输出预测坐标
     def predict_coor(self,CoorX_Arr,CoorY_Arr):
