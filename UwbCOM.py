@@ -44,12 +44,15 @@ class SerialAssistant:
             "nLos": 0                           #记录用户nLos次数   
         }
         
-        self.distance_list = [self.initial_dict.copy() for _ in range(20)]
-
+        self.distance_list = [self.initial_dict.copy() for _ in range(20)]  #初始化20个用户的数据
 
         self.init_draw = 0                      #限制除用户外，其它图形多次作图
         self.flag_str = ""                      #判断需要获取的卡信息种类                   
         self.Master2SlverDistance = 0;          #画图用的闸间距
+        #lift mode
+        self.radius = 0                       #UWB初始扫描半径
+        self.lift_deep = 0                    #电梯深度
+        self.lift_height = 0                  #电梯高度
 
         #坐标
         self.x = 0
@@ -62,8 +65,6 @@ class SerialAssistant:
         self.button_fg = "#FFFFFF"  # 按钮前景色
         self.red_list = ['#FF6347', '#FF684C', '#FF6D51', '#FF7256', '#FF775B', '#FF7C60', '#FF8165', '#FF866A', '#FF8B6F', '#FF9074', '#FF9579', '#FF9A7E', '#FF9F83', '#FFA488', '#FFA98D', '#FFAE92', '#FFB397', '#FFB89C', '#FFBDA1', '#FFC2A6', '#FFC7AB', '#FFCCB0', '#FFD1B5', '#FFD6BA', '#FFDBBF']#, '#FFE0C4', '#FFE5C9', '#FFEACE', '#FFEFD3', '#FFF4D8', '#FFF9DD', '#FFFEE2', '#FFFFE7', '#FFFFEC', '#FFFFF1']
         self.blue_list = ['#4A90E2', '#4F95E2', '#549AE2', '#599FE2', '#5EA4E2', '#63A9E2', '#68AEE2', '#6DB3E2', '#72B8E2', '#77BDE2', '#7CC2E2', '#81C7E2', '#86CCE2', '#8BD1E2', '#90D6E2', '#95DBE2', '#9AE0E2', '#9FE5E2', '#A4EAE2', '#A9EFE2', '#AEF4E2', '#B3F9E2', '#B8FEE2', '#BDFFE2', '#C2FFE2']#, '#C7FFE2', '#CCFFE2', '#D1FFE2', '#D6FFE2', '#DBFFE2', '#E0FFE2', '#E5FFE2', '#EAFFE2', '#EFFFE2', '#F4FFE2']
-        
-        self.colorflag = 0
         self.master.geometry("850x800")
 
         # 创建界面
@@ -154,60 +155,138 @@ class SerialAssistant:
         self.text_area4 = ttk.Entry(frame_settings,width=entry_width,bootstyle="info")
         self.text_area4.grid(row=1, column=5, padx=5, pady=5, sticky='nsew')
         
-
         '''
         description: 通信区域
         '''        
-        
-        # 创建一个标签框架
-        frame_comm = ttk.LabelFrame(self.master, text="通信区",bootstyle="info")
+        # 通信区总框架
+        frame_comm = ttk.LabelFrame(self.master, text="通信区",width = 100 ,height=10,bootstyle="info")
         frame_comm.grid(row=1, column=0, padx=5, pady=5,sticky='nsew')
         frame_comm.grid_columnconfigure(0, weight=1)
         frame_comm.grid_columnconfigure(1, weight=1)
-        frame_comm.grid_columnconfigure(2, weight=1)
+        frame_comm.grid_rowconfigure(0, weight=1)
+        #frame_comm.grid_propagate(False)  # 防止父容器根据子控件的大小自动调整自身大小
         
-        self.text_var = tk.StringVar()  # 存储文本数据的变量
-        
-        # 创建并放置第一个文本框
-        self.text_box = scrolledtext.ScrolledText(frame_comm, width=80, height=12)
+        # 总框架左侧单独一个文本框
+        self.text_box = ttk.ScrolledText(frame_comm, width=60, height=10)
         self.text_box.grid(row=0, column=0, padx=1, pady=1,sticky='nsew')
+        
+         #右侧总宽度
+        frame_comm_sub_width = 40
+        # 总框架右侧子总框
+        frame_comm_sub = ttk.Frame(frame_comm, width=frame_comm_sub_width,height=10)        
+        frame_comm_sub.grid(row=0, column=1, padx=1, pady=1,sticky='nsew')
+        frame_comm_sub.grid_rowconfigure(0,weight=1)
+        frame_comm_sub.grid_rowconfigure(1,weight=1)
+        frame_comm_sub.grid_columnconfigure(0, weight=1)
+
+        # 子总框上侧功能框
+        frame_sub_func_height = 5
+        frame_sub_func = ttk.Frame(frame_comm_sub, width=frame_comm_sub_width,height=frame_sub_func_height,bootstyle="info")
+        frame_sub_func.grid(row=0, column=0, padx=1, pady=1,sticky='nsew')
+        frame_sub_func.grid_rowconfigure(0,weight=1)
+        frame_sub_func.grid_columnconfigure(0, weight=1)   
 
         # 创建第二个文本框并放置在同一行
-        self.text_box2 = scrolledtext.ScrolledText(frame_comm, width=28, height=12)
-        self.text_box2.grid(row=0, column=1, padx=1, pady=1,sticky='nsew')
+        self.text_box2 = scrolledtext.ScrolledText(frame_sub_func, width=45,height=frame_sub_func_height)
+        self.text_box2.grid(row=0, column=0, padx=1, pady=1,sticky='nsew')
         
-        frame2Width = 10
-        # 创建第二个框架
-        frame2 = ttk.Frame(frame_comm, width=frame2Width, height=12)
-        frame2.grid(row=0, column=2, padx=1, pady=1,sticky='nsew')
-        frame2.grid_rowconfigure(0,weight=1)
-        frame2.grid_rowconfigure(1,weight=1)
-        frame2.grid_rowconfigure(2,weight=1)
-        frame2.grid_rowconfigure(3,weight=1)
-        frame2.grid_rowconfigure(4,weight=1)
-        frame2.grid_columnconfigure(0, weight=1)
+        frame_bt_width = 5
+        # 基础功能框架
+        frame_bt = ttk.Frame(frame_sub_func, width=frame_bt_width,height=frame_sub_func_height,bootstyle="info")
+        frame_bt.grid(row=0, column=1, padx=1, pady=1,sticky='nsew')
+        frame_bt.grid_rowconfigure(0,weight=1)
+        frame_bt.grid_rowconfigure(1,weight=1)
+        frame_bt.grid_rowconfigure(2,weight=1)
+        frame_bt.grid_columnconfigure(0, weight=1)
+        # frame_bt.
 
         # 创建并放置清除第一个文本框内容的按钮
-        clear_button = ttk.Button(frame2, text="清除 1", command=lambda:self.clearAndSave_text(1),width=frame2Width,bootstyle="info")
+        clear_button = ttk.Button(frame_bt, text="清除", command=lambda:self.clearAndSave_text(1),width=frame_bt_width,bootstyle="info")
         clear_button.grid(row=0, column=0, padx=1, pady=1,sticky='nsew')
-
-        # 创建并放置清除第二个文本框内容的按钮
-        clear_button2 = ttk.Button(frame2, text="清除 2", command=lambda:self.clearAndSave_text(2),width=frame2Width,bootstyle="info")
-        clear_button2.grid(row=1, column=0, padx=1, pady=1,sticky='nsew')
         
         # 创建并放置清除第一个文本框内容的按钮
-        clear_button3 = ttk.Button(frame2, text="保存 1", command=lambda:self.clearAndSave_text(3),width=frame2Width,bootstyle="info")
-        clear_button3.grid(row=2, column=0, padx=1, pady=1,sticky='nsew')
+        clear_button3 = ttk.Button(frame_bt, text="保存1", command=lambda:self.clearAndSave_text(3),width=frame_bt_width,bootstyle="info")
+        clear_button3.grid(row=1, column=0, padx=1, pady=1,sticky='nsew')
 
         # 创建并放置清除第二个文本框内容的按钮
-        clear_button4 = ttk.Button(frame2, text="保存 2", command=lambda:self.clearAndSave_text(4),width=frame2Width,bootstyle="info")
-        clear_button4.grid(row=3, column=0, padx=1, pady=1,sticky='nsew')
+        clear_button4 = ttk.Button(frame_bt, text="保存2", command=lambda:self.clearAndSave_text(4),width=frame_bt_width,bootstyle="info")
+        clear_button4.grid(row=2, column=0, padx=1, pady=1,sticky='nsew')
 
-        animation_button1 = ttk.Button(frame2, text="演示 1", command=self.run_UWB_Animation_plan1, width=frame2Width,bootstyle="info")
-        animation_button1.grid(row=4, column=0, padx=1, pady=1,sticky='nsew')
+        # 子总框下侧功能框(更具进度条的值，更新演示图中电梯的高度和深度,半径)
+        frame_sub_lift = ttk.LabelFrame(frame_comm_sub, width=frame_comm_sub_width, height=15,text="Elevator scheme demonstration",bootstyle="info")
+        frame_sub_lift.grid(row=1, column=0, padx=1, pady=1,sticky='nsew')
+        frame_sub_lift.grid_rowconfigure(0,weight=1)
+        frame_sub_lift.grid_rowconfigure(1,weight=1)
+        frame_sub_lift.grid_rowconfigure(2,weight=1)
+        frame_sub_lift.grid_columnconfigure(1, weight=1)
+
+        # 添加第一个进度条
+        progressbar1 = ttk.Scale(frame_sub_lift, orient="horizontal", length=100, from_=0, to=10,bootstyle="info")
+        progressbar1.grid(row=0, column=1, padx=1, pady=1, sticky='nsew')
+        progressbar1.set(2.0)
+
+        # 添加一个标签来显示第一个进度条的值
+        progressbar1_value = tk.StringVar(value=f"LIFT_D : {progressbar1.get():.1f}")
+        progressbar1_label = ttk.Label(frame_sub_lift, textvariable=progressbar1_value)
+        progressbar1_label.grid(row=0, column=0, padx=1, pady=1, sticky='nsew')
+
+        # 赋值给self.lift_deep
+        def update_progressbar1_value(event):
+            value = f"LIFT_D : {progressbar1.get():.1f}"
+            progressbar1_value.set(value)
+            self.lift_deep = float(value.split(":")[1].strip())
+
+        progressbar1.bind("<Motion>", update_progressbar1_value)
+        progressbar1.bind("<ButtonRelease-1>", update_progressbar1_value)
+
+        # 添加第二个进度条
+        progressbar2 = ttk.Scale(frame_sub_lift, orient="horizontal", length=100, from_=0, to=10,bootstyle="warning")
+        progressbar2.grid(row=1, column=1, padx=1, pady=1, sticky='nsew')
+        progressbar2.set(3.0)
+
+        # 赋值给self.lift_height
+        progressbar2_value = tk.StringVar(value=f"LIFT_H : {progressbar2.get():.1f}")
+        progressbar2_label = ttk.Label(frame_sub_lift, textvariable=progressbar2_value)
+        progressbar2_label.grid(row=1, column=0, padx=1, pady=1, sticky='nsew')
+
+        # 更新第二个进度条标签的值
+        def update_progressbar2_value(event):
+            value = f"LIFT_H : {progressbar2.get():.1f}"
+            progressbar2_value.set(value)
+            self.lift_height = float(value.split(":")[1].strip())
+
+        progressbar2.bind("<Motion>", update_progressbar2_value)
+        progressbar2.bind("<ButtonRelease-1>", update_progressbar2_value)
+
+        # 添加第三个进度条
+        progressbar3 = ttk.Scale(frame_sub_lift, orient="horizontal", length=100, from_=0, to=10)
+        progressbar3.grid(row=2, column=1, padx=1, pady=1, sticky='nsew')
+        progressbar3.set(2.0)
+
+        # 添加一个标签来显示第三个进度条的值
+        self.progressbar3_value = tk.StringVar(value=f"UWB_R : {progressbar3.get():.1f}")
+        progressbar3_label = ttk.Label(frame_sub_lift, textvariable=self.progressbar3_value)
+        progressbar3_label.grid(row=2, column=0, padx=1, pady=1, sticky='nsew')
+
+        # 更新第三个进度条标签的值
+        def update_progressbar3_value(event):
+            value = f"UWB_R : {progressbar3.get():.1f}"
+            self.progressbar3_value.set(value)
+            # 赋值给self.radius
+            self.radius = float(value.split(":")[1].strip())
+
+        progressbar3.bind("<Motion>", update_progressbar3_value)
+        progressbar3.bind("<ButtonRelease-1>", update_progressbar3_value)
+
+        animation_button1 = ttk.Button(frame_sub_lift, text="演示 1", command=self.run_UWB_Lift_Animation_plan_1, width=5,bootstyle="info")
+        animation_button1.grid(row=0, column=2, padx=1, pady=0,sticky='nsew')
         
-        animation_button2 = ttk.Button(frame2, text="演示 2", command=self.run_UWB_Animation_plan2, width=frame2Width,bootstyle="info")
-        animation_button2.grid(row=5, column=0, padx=1, pady=1,sticky='nsew')
+        animation_button2 = ttk.Button(frame_sub_lift, text="演示 2", command=self.run_UWB_Lift_Animation_plan_2, width=5,bootstyle="info")
+        animation_button2.grid(row=1, column=2, padx=1, pady=1,sticky='nsew')
+
+        animation_button2 = ttk.Button(frame_sub_lift, text="占 位", command=self.run_UWB_Lift_Animation_plan_2, width=5,bootstyle="info")
+        animation_button2.grid(row=2, column=2, padx=1, pady=1,sticky='nsew')
+
         '''
         description: 画布区域
         '''        
@@ -258,7 +337,6 @@ class SerialAssistant:
     def clearAndSave_text(self,flag):
         if flag == 1:
             self.text_box.delete(1.0, tk.END)
-        elif flag == 2:
             self.text_box2.delete(1.0,tk.END)
             self.text_area1.delete(0,tk.END)
             self.text_area2.delete(0,tk.END)
@@ -329,7 +407,6 @@ class SerialAssistant:
     def read_data(self):
         self.UserInfo = "@Qi"
         self.CardInfoChar = "1E006F";
-        
         while self.serial and self.serial.is_open:
             try:
                 data = self.serial.readline()
@@ -338,14 +415,8 @@ class SerialAssistant:
 
                     #卡片信息读取
                     if self.CardInfoChar in data:
-                        # self.text_box.insert(tk.END,str(data))
-                        # print("receive card info.")
-                        #print(data)
-                        print(data)
-                        print("*******************")
-                        # self.text_box.see(tk.END)
+                        # print(data)
                         self.show_cardData(data)                                            
-                    
                     if self.UserInfo in data:               
                         #获取用户下标，更新该用户的距离数据
                         
@@ -374,7 +445,7 @@ class SerialAssistant:
                                     print("LIFT模式下,进行坐标映射")
                                     self.y = math.sqrt(abs(self.y**2 - 35*35))  
                                 self.y = self.y + 60 
-                                self.text_box2.insert(tk.END,f"{idx} , {self.x-400:.0f} , {self.y-60:.0f}\n")
+                                self.text_box2.insert(tk.END,f"<user,x,y> {idx} , {self.x-400:.0f} , {self.y-60:.0f}\n")
                                 self.text_box2.see(tk.END)
                                 
                                 self.distance_list[idx]['ZScoreFlag'] += 1
@@ -530,11 +601,11 @@ class SerialAssistant:
                              "Author: @QLL\n"
                              )
             
-    def run_UWB_Animation_plan1(self):
-        uwb_animation = UWBLiftAnimationPlan1()
+    def run_UWB_Lift_Animation_plan_1(self):
+        uwb_animation = UWBLiftAnimationPlan1(radius=self.radius,lift_deep=self.lift_deep,lift_height=self.lift_height)
         uwb_animation.start_animation()
-    def run_UWB_Animation_plan2(self):
-        uwb_animation = UWBLiftAnimationPlan2()
+    def run_UWB_Lift_Animation_plan_2(self):
+        uwb_animation = UWBLiftAnimationPlan2(radius=self.radius,lift_deep=self.lift_deep,lift_height=self.lift_height)
         uwb_animation.start_animation()
 
 def main():
