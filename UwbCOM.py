@@ -21,7 +21,7 @@ from lift_uwb_dynamic_detect_plan import UWBLiftAnimationPlan1,UWBLiftAnimationP
 class SerialAssistant:
     def __init__(self, master):
         self.master = master
-        master.title("UwbCOM")
+        master.title("UwbCOM V2.0.1")
         self.master.minsize(800, 1)
         self.serial_ports = []
 
@@ -67,6 +67,8 @@ class SerialAssistant:
         self.red_list = ['#FF6347', '#FF684C', '#FF6D51', '#FF7256', '#FF775B', '#FF7C60', '#FF8165', '#FF866A', '#FF8B6F', '#FF9074', '#FF9579', '#FF9A7E', '#FF9F83', '#FFA488', '#FFA98D', '#FFAE92', '#FFB397', '#FFB89C', '#FFBDA1', '#FFC2A6', '#FFC7AB', '#FFCCB0', '#FFD1B5', '#FFD6BA', '#FFDBBF']#, '#FFE0C4', '#FFE5C9', '#FFEACE', '#FFEFD3', '#FFF4D8', '#FFF9DD', '#FFFEE2', '#FFFFE7', '#FFFFEC', '#FFFFF1']
         self.blue_list = ['#4A90E2', '#4F95E2', '#549AE2', '#599FE2', '#5EA4E2', '#63A9E2', '#68AEE2', '#6DB3E2', '#72B8E2', '#77BDE2', '#7CC2E2', '#81C7E2', '#86CCE2', '#8BD1E2', '#90D6E2', '#95DBE2', '#9AE0E2', '#9FE5E2', '#A4EAE2', '#A9EFE2', '#AEF4E2', '#B3F9E2', '#B8FEE2', '#BDFFE2', '#C2FFE2']#, '#C7FFE2', '#CCFFE2', '#D1FFE2', '#D6FFE2', '#DBFFE2', '#E0FFE2', '#E5FFE2', '#EAFFE2', '#EFFFE2', '#F4FFE2']
         self.master.geometry("850x800")
+        icon_path = os.path.join(os.path.dirname(__file__), 'UWB.ico')
+        self.master.wm_iconbitmap(icon_path)
 
         # 创建界面
         self.create_widgets()
@@ -598,9 +600,10 @@ class SerialAssistant:
 
     # 显示关于对话框
     def show_about(self):
-        messagebox.showinfo("关于", "UwbCOM v1.0\n\n"
+        messagebox.showinfo("关于", "UwbCOM v2.0.1\n\n"
                              "版权所有 © 2024 可为有限公司\n"
                              "Author: @QLL\n"
+                             "Email: ximing766@gmail.com\n"
                              )
             
     def run_UWB_Lift_Animation_plan_1(self):
@@ -615,6 +618,7 @@ def main():
     themes = ['cosmo', 'flatly', 'litera', 'minty', 'lumen', 'sandstone', 'yeti', 'pulse', 'united', 'morph', 'journal', 'darkly', 'superhero', 'solar', 'cyborg', 'vapor', 'simplex', 'cerculean']
     style = ttk.Style("minty")    # "lumen" "minty" "sandstone"
     # print(ttk.Style().theme_names())
+    
     app = SerialAssistant(root)
 
     def change_theme(theme_name):
