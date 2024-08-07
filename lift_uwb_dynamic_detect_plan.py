@@ -168,9 +168,10 @@ class UWBLiftAnimationPlan1:
             [[round(x, 2), round(y, 2)] for x, y in intersection]
             for intersection in self.min_sum_intersections
         ]
-        if(self.lift_height > formatted_intersections[0][0][1]):
-            minimum_r = float(math.sqrt(formatted_intersections[0][0][0]**2 + ((self.lift_height-formatted_intersections[0][0][1])**2)))
-            formatted_intersections[0][0].append(round(minimum_r,2))
+        if formatted_intersections and len(formatted_intersections) > 0 and len(formatted_intersections[0]) > 0 and len(formatted_intersections[0][0]) > 0:
+            if(self.lift_height > formatted_intersections[0][0][1]):
+                minimum_r = float(math.sqrt(formatted_intersections[0][0][0]**2 + ((self.lift_height-formatted_intersections[0][0][1])**2)))
+                formatted_intersections[0][0].append(round(minimum_r,2))
 
         # 将 formatted_intersections 转换为字符串并去掉中括号
         formatted_intersections_str = str(formatted_intersections).replace('[', '').replace(']', '') 
@@ -355,9 +356,10 @@ class UWBLiftAnimationPlan2:
             [[round(x, 2), round(y, 2)] for x, y in intersection]
             for intersection in self.min_sum_intersections
         ]
-        if(self.lift_height > formatted_intersections[0][0][1]):
-            minimum_r = float(math.sqrt((formatted_intersections[0][0][0]/2)**2 + ((self.lift_height-formatted_intersections[0][0][1])**2)))
-            formatted_intersections[0][0].append(round(minimum_r,2))
+        if formatted_intersections and len(formatted_intersections) > 0 and len(formatted_intersections[0]) > 0 and len(formatted_intersections[0][0]) > 0:
+            if(self.lift_height > formatted_intersections[0][0][1]):
+                minimum_r = float(math.sqrt((formatted_intersections[0][0][0]/2)**2 + ((self.lift_height-formatted_intersections[0][0][1])**2)))
+                formatted_intersections[0][0].append(round(minimum_r,2))
 
         # 将 formatted_intersections 转换为字符串并去掉中括号
         formatted_intersections_str = str(formatted_intersections).replace('[', '').replace(']', '') 

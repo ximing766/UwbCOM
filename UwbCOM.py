@@ -41,7 +41,8 @@ class SerialAssistant:
             "CoorX_Arr": np.array([]),
             "CoorY_Arr": np.array([]),
             "ZScoreFlag" : 0,                    #Z-Score异常值处理标志,记录未经过Z-Score处理过的新坐标数量
-            "nLos": 0                           #记录用户nLos次数   
+            "nLos": 0,                     #记录用户nLos次数   
+            "lift_deep": 0,
         }
         
         self.distance_list = [self.initial_dict.copy() for _ in range(20)]  #初始化20个用户的数据
@@ -425,6 +426,7 @@ class SerialAssistant:
                         self.distance_list[idx]['SlaverDistance'] = int(data.split(':')[3].strip())
                         self.distance_list[idx]['GateDistance'] = int(data.split(':')[5].strip())
                         self.distance_list[idx]['nLos'] = int(data.split(':')[7].strip())
+                        self.distance_list[idx]['lift_deep'] = int(data.split(':')[11].strip())
 
                         self.text_box.insert(tk.END, "用户 " + str(idx) + "  |  " + "nLos: " + str(self.distance_list[idx]['nLos']) + " <1-遮挡>" +  "  |  " +"主,从,门:  " + str(self.distance_list[idx]['MasterDistance']) + " ," + str(self.distance_list[idx]['SlaverDistance']) +" ,"  \
                                              + str(self.distance_list[idx]['GateDistance']) + " <cm>" + "\n")
@@ -502,7 +504,7 @@ class SerialAssistant:
             #time.sleep(0.05)
 
     def draw_user(self,user,idx):
-        colors = ['black',  'teal','red', 'green', 'blue', 'yellow', 'orange', 'purple', 'pink', 'brown', 'gray', 'cyan', 'magenta', 'navy', 'maroon', 'olive', 'lime', 'aqua', 'indigo' ,'plum']
+        colors = ['purple',  'teal','magenta', 'green', 'blue', 'yellow', 'orange', 'purple', 'pink', 'brown', 'gray', 'cyan', 'red', 'navy', 'maroon', 'olive', 'lime', 'aqua', 'indigo' ,'plum']
         tags = "user" + str(idx)
         self.canvas.delete(tags)
         #self.canvas.delete("cor_x")
@@ -541,7 +543,7 @@ class SerialAssistant:
             self.canvas.create_arc(400-self.Master2SlverDistance/2, 60-self.Master2SlverDistance/2, 400+self.Master2SlverDistance/2, 60+self.Master2SlverDistance/2, start=180, extent=180, fill='#FF6347',outline="#FF6347")
         #self.canvas.create_text(360,300,text="坐标:")
         elif selected_mode == 'LIFT':
-            self.canvas.create_rectangle(400-self.Master2SlverDistance/2, 60, 400+self.Master2SlverDistance/2, 60+55, width=1, outline="#4A90E2", fill="#4A90E2")
+            self.canvas.create_rectangle(400-self.Master2SlverDistance/2, 60, 400+self.Master2SlverDistance/2, 60+self.distance_list[0]['lift_deep'], width=1, outline="#4A90E2", fill="#4A90E2")
         self.init_draw = 1
     def on_mode_change(self,event=None):
         self.draw_basic();              
