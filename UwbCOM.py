@@ -21,7 +21,7 @@ from lift_uwb_dynamic_detect_plan import UWBLiftAnimationPlan1,UWBLiftAnimationP
 class SerialAssistant:
     def __init__(self, master):
         self.master = master
-        master.title("UwbCOM V2.0.1")
+        master.title("UwbCOM V2.0.2")
         self.master.minsize(800, 1)
         self.serial_ports = []
 
@@ -430,8 +430,9 @@ class SerialAssistant:
                         self.distance_list[idx]['nLos'] = int(data.split(':')[7].strip())
                         self.distance_list[idx]['lift_deep'] = int(data.split(':')[11].strip())
 
-                        self.text_box.insert(tk.END, "用户 " + str(idx) + "  |  " + "nLos: " + str(self.distance_list[idx]['nLos']) + " <1-遮挡>" +  "  |  " +"主,从,门:  " + str(self.distance_list[idx]['MasterDistance']) + " ," + str(self.distance_list[idx]['SlaverDistance']) +" ,"  \
-                                             + str(self.distance_list[idx]['GateDistance']) + " <cm>" + "\n")
+                        self.text_box.insert(tk.END, "用户 " + str(idx) + "  |  " + "nLos: " + str(self.distance_list[idx]['nLos'])  +  "  |  " +"主,从,门:  " \
+                                             + str(self.distance_list[idx]['MasterDistance']) + " ," + str(self.distance_list[idx]['SlaverDistance']) +" ,"  \
+                                                + str(self.distance_list[idx]['GateDistance']) + " <cm>" + "\n")
                         self.text_box.see(tk.END)
                         
                         if self.Master2SlverDistance == 0:
@@ -442,87 +443,97 @@ class SerialAssistant:
                             #计算用户坐标
                             self.x = 400 + int(((self.distance_list[idx]['SlaverDistance']**2 - self.distance_list[idx]['MasterDistance']**2) / (2*self.distance_list[idx]['GateDistance'])))
                             #异常值去除，防止开到负根
-                            if abs(self.distance_list[idx]['MasterDistance']**2 - (self.x - (400 + self.distance_list[idx]['GateDistance']/2))**2) > 0:
-                                self.y = int(math.sqrt(abs(self.distance_list[idx]['MasterDistance']**2 - (self.x - (400 + self.distance_list[idx]['GateDistance']/2))**2)))
-                                # Lift模式下，进行坐标映射
-                                if self.modeCombo.get() == "LIFT":
-                                    print("LIFT模式下,进行坐标映射")
-                                    self.y = math.sqrt(abs(self.y**2 - 35*35))  
-                                self.y = self.y + 60 
-                                self.text_box2.insert(tk.END,f"<user,x,y> {idx} , {self.x-400:.0f} , {self.y-60:.0f}\n")
-                                self.text_box2.see(tk.END)
+                            # if abs(self.distance_list[idx]['MasterDistance']**2 - (self.x - (400 + self.distance_list[idx]['GateDistance']/2))**2) > 0:
+                            self.y = int(math.sqrt(abs(self.distance_list[idx]['MasterDistance']**2 - (self.x - (400 + self.distance_list[idx]['GateDistance']/2))**2)))
+                            # Lift模式下，进行坐标映射
+                            if self.modeCombo.get() == "LIFT":
+                                print("LIFT模式下,进行坐标映射")
+                                self.y = math.sqrt(abs(self.y**2 - 35*35))  
+                            self.y = self.y + 60 
+                            self.text_box2.insert(tk.END,f"<user,x,y> {idx} , {self.x-400:.0f} , {self.y-60:.0f}\n")
+                            self.text_box2.see(tk.END)
+                            
+                            self.distance_list[idx]['ZScoreFlag'] += 1
+                            
+                            self.distance_list[idx]['CoorX_Arr'] = np.append(self.distance_list[idx]['CoorX_Arr'],self.x)
+                            self.distance_list[idx]['CoorY_Arr'] = np.append(self.distance_list[idx]['CoorY_Arr'],self.y)                                                           
+                            #self.draw_user(self.CoorX_Arr[-1],self.CoorY_Arr[-1])                             
+                            
+                            if len(self.distance_list[idx]['CoorX_Arr']) == 20:                                                                
                                 
-                                self.distance_list[idx]['ZScoreFlag'] += 1
+                                #start_time = time.perf_counter()
+                                #异常值去除:Z-Score  ：每20轮调用一次，一次处理20组coornidate。保证所有数据都能被处理的同时，最大程度消减新coornidate移动带来的偏差。
+                                if self.distance_list[idx]['ZScoreFlag'] == len(self.distance_list[idx]['CoorX_Arr']):
+                                    self.distance_list[idx]['CoorX_Arr'] ,self.distance_list[idx]['CoorY_Arr'] = self.Z_Score(self.distance_list[idx]['CoorX_Arr'],self.distance_list[idx]['CoorY_Arr'])
+                                    self.distance_list[idx]['ZScoreFlag'] = 0
                                 
-                                self.distance_list[idx]['CoorX_Arr'] = np.append(self.distance_list[idx]['CoorX_Arr'],self.x)
-                                self.distance_list[idx]['CoorY_Arr'] = np.append(self.distance_list[idx]['CoorY_Arr'],self.y)                                                           
-                                #self.draw_user(self.CoorX_Arr[-1],self.CoorY_Arr[-1])                             
-                                
-                                if len(self.distance_list[idx]['CoorX_Arr']) == 20:                                                                
-                                    
-                                    #start_time = time.perf_counter()
-                                    #异常值去除:Z-Score  ：每20轮调用一次，一次处理20组coornidate。保证所有数据都能被处理的同时，最大程度消减新coornidate移动带来的偏差。
-                                    if self.distance_list[idx]['ZScoreFlag'] == len(self.distance_list[idx]['CoorX_Arr']):
-                                        self.distance_list[idx]['CoorX_Arr'] ,self.distance_list[idx]['CoorY_Arr']= self.Z_Score(self.distance_list[idx]['CoorX_Arr'],self.distance_list[idx]['CoorY_Arr'])
-                                        self.distance_list[idx]['ZScoreFlag'] = 0
-                                    
-                                    if len(self.distance_list[idx]['CoorX_Arr']) < 20:
-                                        print('Z-Socre reduce some data,return.',len(self.distance_list[idx]['CoorX_Arr']))
-                                    else:
-                                        #滤波:Moving-Average
-                                        self.distance_list[idx]['CoorX_Arr'] = self.moving_average(self.distance_list[idx]['CoorX_Arr'],2).astype(int)
-                                        self.distance_list[idx]['CoorY_Arr'] = self.moving_average(self.distance_list[idx]['CoorY_Arr'],2).astype(int)
-                                        
-                                        #创建回归曲线模型，预测用户坐标位置
-                                        self.predict_x,self.predict_y = self.predict_coor(self.distance_list[idx]['CoorX_Arr'],self.distance_list[idx]['CoorY_Arr'])
-                                        # self.text_box.insert(tk.END, "预测用户" + str(idx) + "位置..." + "\n")
-                                        # self.text_box.see(tk.END)
-                                        
-                                        #添加预测数据到数组末尾
-                                        self.distance_list[idx]['CoorX_Arr'] = np.append(self.distance_list[idx]['CoorX_Arr'],self.predict_x)    
-                                        self.distance_list[idx]['CoorY_Arr'] = np.append(self.distance_list[idx]['CoorY_Arr'],self.predict_y)
-                                        
-                                        #绘制用户坐标位置
-                                        
-                                        self.draw_user(self.distance_list,idx)  
-
-                                        
-                                        #删除一部分，添加新的运动趋势
-                                        self.distance_list[idx]['CoorX_Arr'] = np.delete(self.distance_list[idx]['CoorX_Arr'],[0])           
-                                        self.distance_list[idx]['CoorY_Arr'] = np.delete(self.distance_list[idx]['CoorY_Arr'],[0])
-                                                                                                                 
-                                        #end_time = time.perf_counter()
-                                        #run_time = end_time - start_time
-    
-                                        #print(f"绘制时间(不含搜集数据): {run_time} 秒")
+                                if len(self.distance_list[idx]['CoorX_Arr']) < 20:
+                                    print('Z-Socre reduce some data,return.',len(self.distance_list[idx]['CoorX_Arr']))
                                 else:
-                                    pass
+                                    #滤波:Moving-Average
+                                    self.distance_list[idx]['CoorX_Arr'] = self.moving_average(self.distance_list[idx]['CoorX_Arr'],2).astype(int)
+                                    self.distance_list[idx]['CoorY_Arr'] = self.moving_average(self.distance_list[idx]['CoorY_Arr'],2).astype(int)
+                                    
+                                    #创建回归曲线模型，预测用户坐标位置
+                                    self.predict_x,self.predict_y = self.predict_coor(self.distance_list[idx]['CoorX_Arr'],self.distance_list[idx]['CoorY_Arr'])
+                                    # self.text_box.insert(tk.END, "预测用户" + str(idx) + "位置..." + "\n")
+                                    # self.text_box.see(tk.END)
+                                    
+                                    #添加预测数据到数组末尾
+                                    self.distance_list[idx]['CoorX_Arr'] = np.append(self.distance_list[idx]['CoorX_Arr'],self.predict_x)    
+                                    self.distance_list[idx]['CoorY_Arr'] = np.append(self.distance_list[idx]['CoorY_Arr'],self.predict_y)
+                                    
+                                    #绘制用户坐标位置
+                                    
+                                    self.draw_user(self.distance_list,idx)  
+
+                                    
+                                    #删除一部分，添加新的运动趋势
+                                    self.distance_list[idx]['CoorX_Arr'] = np.delete(self.distance_list[idx]['CoorX_Arr'],[0])           
+                                    self.distance_list[idx]['CoorY_Arr'] = np.delete(self.distance_list[idx]['CoorY_Arr'],[0])
+                                                                                                                
+                                    #end_time = time.perf_counter()
+                                    #run_time = end_time - start_time
+
+                                    #print(f"绘制时间(不含搜集数据): {run_time} 秒")
                             else:
-                                print("距离数据有误,计算出Y为负数")
+                                pass
+                            # else:
+                            #     print("距离数据有误,计算出Y为负数")
             except serial.SerialException:
                 self.text_box.insert(tk.END, "串口连接已断开\n")
                 break
 
             #time.sleep(0.05)
+    def check_nLos(self):
+        for idx, item in enumerate(self.distance_list):
+            if item.get('nLos') == 1:
+                print(f"Found nLos == 1 at index {idx}")
+                return True
+        return False
 
     def draw_user(self,user,idx):
-        colors = ['purple',  'teal','magenta', 'green', 'blue', 'yellow', 'orange', 'purple', 'pink', 'brown', 'gray', 'cyan', 'red', 'navy', 'maroon', 'olive', 'lime', 'aqua', 'indigo' ,'plum']
+        colors = ['purple',  'teal','magenta', 'green', 'blue', 'yellow', 'orange', 'purple', 'pink', 'brown', 'gray', 'cyan', 'red', 'navy', 'maroon', \
+                  'olive', 'lime', 'aqua', 'indigo' ,'plum']
         tags = "user" + str(idx)
         self.canvas.delete(tags)
-        #self.canvas.delete("cor_x")
-        #self.canvas.delete("cor_y")
-        #绘制用户(圆，需要动态变化)
-        # 参数分别为：左上角坐标、右下角坐标
-        #self.draw_basic()   #绘制完basic后需要将所有用户点都刷新一遍
-        # for i in range(20):
-        #     if len(user[i]['CoorX_Arr']) > 0: 
-        #         self.canvas.create_oval(user[i]['CoorX_Arr'][-1]-5, user[i]['CoorY_Arr'][-1]-5, user[i]['CoorX_Arr'][-1]+5, user[i]['CoorY_Arr'][-1]+5, outline=colors[i], fill=colors[i],tags=("user" + str(i)))
 
-        #self.canvas.create_text(400,300,text="("+str(x)+",",tags="cor_x")
-        #self.canvas.create_text(440,300,text=str(y)+")",tags="cor_y")
+        #用户被遮挡，绘制扩展区域
+        selected_mode = self.modeCombo.get()
+        if  selected_mode == "GATE":
+            if self.check_nLos() == True:  #只要有一个用户被遮挡，就绘制扩展区域
+                if not self.canvas.find_withtag("nLos"): #防止重复绘制
+                    self.canvas.create_arc(400-self.Master2SlverDistance/2 - 12.5, 60-self.Master2SlverDistance/2 -12.5, 400+self.Master2SlverDistance/2 + 12.5, \
+                                        60+self.Master2SlverDistance/2 +12.5, start=180, extent=180, fill='plum',outline="plum",tags="nLos") #FFA54F
+                    self.canvas.create_arc(400-self.Master2SlverDistance/2, 60-self.Master2SlverDistance/2, 400+self.Master2SlverDistance/2,  \
+                                        60+self.Master2SlverDistance/2, start=180, extent=180, fill='#FF6347',outline="#FF6347")
+            elif self.canvas.find_withtag("nLos"):
+                self.canvas.delete("nLos")
+
         if len(user[idx]['CoorX_Arr']) > 0: 
-                self.canvas.create_oval(user[idx]['CoorX_Arr'][-1]-5, user[idx]['CoorY_Arr'][-1]-5, user[idx]['CoorX_Arr'][-1]+5, user[idx]['CoorY_Arr'][-1]+5, outline=colors[idx], fill=colors[idx],tags=("user" + str(idx)))
-        
+                self.canvas.create_oval(user[idx]['CoorX_Arr'][-1]-5, user[idx]['CoorY_Arr'][-1]-5, user[idx]['CoorX_Arr'][-1]+5, user[idx]['CoorY_Arr'][-1]+5,  \
+                                        outline=colors[idx], fill=colors[idx],tags=("user" + str(idx)))
+            
     def draw_basic(self):
         self.canvas.delete("all")
         # 绘制闸机(left)  以400为x原点，右下角坐标:[400-self.Master2SlverDistance/2,60]  左上角坐标[(400-self.Master2SlverDistance/2-30),10]
@@ -542,10 +553,12 @@ class SerialAssistant:
         # 绘制红区(半圆)  r=self.Master2SlverDistance/2  圆心(400,60)  
         # 左上角坐标(400-self.Master2SlverDistance/2,60-self.Master2SlverDistance/2)
         # 右下角坐标(400+self.Master2SlverDistance/2,60+self.Master2SlverDistance/2)
-            self.canvas.create_arc(400-self.Master2SlverDistance/2, 60-self.Master2SlverDistance/2, 400+self.Master2SlverDistance/2, 60+self.Master2SlverDistance/2, start=180, extent=180, fill='#FF6347',outline="#FF6347")
+            self.canvas.create_arc(400-self.Master2SlverDistance/2, 60-self.Master2SlverDistance/2, 400+self.Master2SlverDistance/2, 60+self.Master2SlverDistance/2, \
+                                   start=180, extent=180, fill='#FF6347',outline="#FF6347")
         #self.canvas.create_text(360,300,text="坐标:")
         elif selected_mode == 'LIFT':
-            self.canvas.create_rectangle(400-self.Master2SlverDistance/2, 60, 400+self.Master2SlverDistance/2, 60+self.distance_list[0]['lift_deep'], width=1, outline="#4A90E2", fill="#4A90E2")
+            self.canvas.create_rectangle(400-self.Master2SlverDistance/2, 60, 400+self.Master2SlverDistance/2, 60+self.distance_list[0]['lift_deep'], \
+                                         width=1, outline="#4A90E2", fill="#4A90E2")
         self.init_draw = 1
     def on_mode_change(self,event=None):
         self.draw_basic();              
@@ -615,7 +628,8 @@ class SerialAssistant:
 
 def main():
     root = tk.Tk()
-    themes = ['cosmo', 'flatly', 'litera', 'minty', 'lumen', 'sandstone', 'yeti', 'pulse', 'united', 'morph', 'journal', 'darkly', 'superhero', 'solar', 'cyborg', 'vapor', 'simplex', 'cerculean']
+    themes = ['cosmo', 'flatly', 'litera', 'minty', 'lumen', 'sandstone', 'yeti', 'pulse', 'united', 'morph', 'journal', 'darkly', 'superhero', \
+              'solar', 'cyborg', 'vapor', 'simplex', 'cerculean']
     style = ttk.Style("minty")    # "lumen" "minty" "sandstone"
     # print(ttk.Style().theme_names())
     
