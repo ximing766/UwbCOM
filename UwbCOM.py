@@ -3,72 +3,63 @@ import tkinter as tk
 import ttkbootstrap as ttk
 import serial
 import threading
-import time
 from tkinter import scrolledtext
 from tkinter import messagebox
 import serial.tools.list_ports
 import math
-import sys
 import os
-from PIL import Image
-from PIL import ImageTk
 from sklearn.linear_model import LinearRegression
 from sklearn.preprocessing import PolynomialFeatures
 from sklearn.linear_model import ElasticNet
 import numpy as np
 from lift_uwb_dynamic_detect_plan import UWBLiftAnimationPlan1,UWBLiftAnimationPlan2
+from KF_classify import KalmanFilter
 
 class SerialAssistant:
     def __init__(self, master):
         self.master = master
-        master.title("UwbCOM V2.0.2")
-        self.master.minsize(800, 1)
-        self.serial_ports = []
-
-        # 设置串口参数
-        self.port = "COM13"  
-        self.baudrate = 115200
-        self.serial_open = False
-
-        self.bytesize = serial.EIGHTBITS        # 数据位
-        self.parity = serial.PARITY_NONE        # 校验位
-        self.stopbits = serial.STOPBITS_ONE     # 停止位
-
-        self.initial_dict = {
-            "GateDistance": 0,
-            "MasterDistance": 0,
-            "SlaverDistance": 0,
-            "CoorX_Arr": np.array([]),
-            "CoorY_Arr": np.array([]),
-            "ZScoreFlag" : 0,                    #Z-Score异常值处理标志,记录未经过Z-Score处理过的新坐标数量
-            "nLos": 0,                     #记录用户nLos次数   
-            "lift_deep": 0,
-        }
-        
-        self.distance_list = [self.initial_dict.copy() for _ in range(20)]  #初始化20个用户的数据
-
-        self.init_draw = 0                      #限制除用户外，其它图形多次作图
-        self.flag_str = ""                      #判断需要获取的卡信息种类                   
-        self.Master2SlverDistance = 0;          #画图用的闸间距
-        #lift mode
-        self.radius = 0                       #UWB初始扫描半径
-        self.lift_deep = 0                    #电梯深度
-        self.lift_height = 0                  #电梯高度
-
-        #坐标
-        self.x = 0
-        self.y = 0
-
-        # 定义颜色方案
-        self.bg_color = "#F0F5F9"  # 背景色
-        self.fg_color = "#222222"  # 前景色
-        self.button_bg = "#4A90E2"  # 按钮背景色
-        self.button_fg = "#FFFFFF"  # 按钮前景色
-        self.red_list = ['#FF6347', '#FF684C', '#FF6D51', '#FF7256', '#FF775B', '#FF7C60', '#FF8165', '#FF866A', '#FF8B6F', '#FF9074', '#FF9579', '#FF9A7E', '#FF9F83', '#FFA488', '#FFA98D', '#FFAE92', '#FFB397', '#FFB89C', '#FFBDA1', '#FFC2A6', '#FFC7AB', '#FFCCB0', '#FFD1B5', '#FFD6BA', '#FFDBBF']#, '#FFE0C4', '#FFE5C9', '#FFEACE', '#FFEFD3', '#FFF4D8', '#FFF9DD', '#FFFEE2', '#FFFFE7', '#FFFFEC', '#FFFFF1']
-        self.blue_list = ['#4A90E2', '#4F95E2', '#549AE2', '#599FE2', '#5EA4E2', '#63A9E2', '#68AEE2', '#6DB3E2', '#72B8E2', '#77BDE2', '#7CC2E2', '#81C7E2', '#86CCE2', '#8BD1E2', '#90D6E2', '#95DBE2', '#9AE0E2', '#9FE5E2', '#A4EAE2', '#A9EFE2', '#AEF4E2', '#B3F9E2', '#B8FEE2', '#BDFFE2', '#C2FFE2']#, '#C7FFE2', '#CCFFE2', '#D1FFE2', '#D6FFE2', '#DBFFE2', '#E0FFE2', '#E5FFE2', '#EAFFE2', '#EFFFE2', '#F4FFE2']
-        self.master.geometry("850x800")
+        master.title("UwbCOM V2.0.5")
+        self.master.minsize(800, 800)
+        self.master.geometry("850x820")
         icon_path = os.path.join(os.path.dirname(__file__), 'UWB.ico')
         self.master.wm_iconbitmap(icon_path)
+
+        # 设置串口参数
+        self.port         = "COM13"
+        self.baudrate     = 115200
+        self.serial_open  = False
+        self.serial_ports = []
+        self.bytesize     = serial.EIGHTBITS            
+        self.parity       = serial.PARITY_NONE          
+        self.stopbits     = serial.STOPBITS_ONE         
+
+        self.distance_list = [{
+            "GateDistance"  : 0,
+            "MasterDistance": 0,
+            "SlaverDistance": 0,
+            "CoorX_Arr"     : np.array([]),
+            "CoorY_Arr"     : np.array([]),
+            "ZScoreFlag"    : 0,                       # Z-Score异常值处理标志, 记录未经过Z-Score处理过的新坐标数量
+            "nLos"          : 0,                      
+            "lift_deep"     : 0,
+            "KF"            : KalmanFilter(0.5, 2, 2), 
+            "KF_predict"    : [0, 0]  
+        } for _ in range(20)]  
+        #self.distance_list = [self.initial_dict.copy() for _ in range(20)]  #初始化20个用户的数据
+
+        ## ** User Define ** ##
+        self.init_draw            = 0                       #限制除用户外，其它图形多次作图
+        self.flag_str             = ""                      #判断需要获取的卡信息种类
+        self.Master2SlverDistance = 0;                      #画图用的闸间距
+
+        self.radius               = 0                       #UWB初始扫描半径
+        self.lift_deep            = 0                       #电梯深度
+        self.lift_height          = 0                       #电梯高度
+
+        self.x                    = 0
+        self.y                    = 0
+        self.cor                  = []
+        self.Use_KF               = True                    #使用卡尔曼滤波器还是弹性网络
 
         # 创建界面
         self.create_widgets()
@@ -76,7 +67,7 @@ class SerialAssistant:
         self.update_combobox_periodically()
     
     def get_serial_ports(self):
-        ports = serial.tools.list_ports.comports()
+        ports        = serial.tools.list_ports.comports()
         serial_ports = [port.device for port in ports]
         return serial_ports
     
@@ -111,11 +102,6 @@ class SerialAssistant:
         self.combo = ttk.Combobox(frame_settings, values=self.get_serial_ports(),bootstyle="primary")
         self.update_combobox()
         self.combo.grid(row=0, column=1, padx=1, pady=5,sticky='we')
-        
-        # serial_port_menu = tk.OptionMenu(frame_settings, self.port_var, *self.get_serial_ports()).grid(row=0, column=1, padx=5, pady=5,sticky='we')
-
-        # ttk.Entry(frame_settings, textvariable=self.port_var, width=10).grid(row=0, column=1, padx=5, pady=5,sticky='we')
-        # self.port_var.set(self.port)
 
         ttk.Label(frame_settings, text="Baud:",bootstyle="danger").grid(row=1, column=0, padx=1, pady=5,sticky='w')
         self.baudrate_var = tk.IntVar()
@@ -123,12 +109,9 @@ class SerialAssistant:
         self.baudCombo = ttk.Combobox(frame_settings,values=['115200','9600','3000000'],bootstyle="primary")
         self.baudCombo.current(0)
         self.baudCombo.grid(row=1, column=1, padx=1, pady=5,sticky='we')
-        
-        # ttk.Entry(frame_settings, textvariable=self.baudrate_var, width=10).grid(row=1, column=1, padx=5, pady=5,sticky='we')
-        # self.baudrate_var.set(self.baudrate)
 
         button_width = 8
-        entry_width = 20
+        entry_width  = 20
 
         self.serial_bt = ttk.Button(frame_settings, text="打开串口", command=self.open_serial, width=button_width,bootstyle="primary")
         self.serial_bt.grid(row=0, column=2, padx=5, pady=5,sticky='ns')
@@ -138,23 +121,19 @@ class SerialAssistant:
         self.modeCombo.grid(row=1, column=2, padx=5, pady=5,sticky='ns')
         self.modeCombo.bind("<<ComboboxSelected>>", self.on_mode_change)
 
-        card_Button = ttk.Button(frame_settings, text="卡  号", command=lambda:self.send_data(11111), width=button_width,bootstyle="primary").grid(row=0, column=4, padx=5, pady=5,sticky='ns')   #这块数据下行
-        self.text_area1 = ttk.Entry(frame_settings,width=entry_width,bootstyle="info")#tk.Text(frame_settings, width=20, height=1)
+        card_Button     = ttk.Button(frame_settings, text="卡  号", command=lambda:self.send_data(11111), width=button_width,bootstyle="primary").grid(row=0, column=4, padx=5, pady=5,sticky='ns')   #这块数据下行
+        self.text_area1 = ttk.Entry(frame_settings,width=entry_width,bootstyle="info")
         self.text_area1.grid(row=0, column=3, padx=5, pady=5, sticky='nsew')
-        #card_Button.pack(side = tk.RIGHT,padx=5,pady=5)
         
-        other_Button = ttk.Button(frame_settings, text="有效期", command=lambda:self.send_data(22222), width=button_width,bootstyle="primary").grid(row=1, column=4, padx=5, pady=5,sticky='ns')
-        #other_Button.pack(side = tk.RIGHT,padx=5,pady=5)
+        other_Button    = ttk.Button(frame_settings, text="有效期", command=lambda:self.send_data(22222), width=button_width,bootstyle="primary").grid(row=1, column=4, padx=5, pady=5,sticky='ns')
         self.text_area2 = ttk.Entry(frame_settings,width=entry_width,bootstyle="info")
         self.text_area2.grid(row=1, column=3, padx=5, pady=5, sticky='nsew') 
         
-        other_Button1 = ttk.Button(frame_settings, text="余  额", command=lambda:self.send_data(33333), width=button_width,bootstyle="primary").grid(row=0, column=6, padx=5, pady=5,sticky='ns')
-        #other_Button.pack(side = tk.RIGHT,padx=5,pady=5)
+        other_Button1   = ttk.Button(frame_settings, text="余  额", command=lambda:self.send_data(33333), width=button_width,bootstyle="primary").grid(row=0, column=6, padx=5, pady=5,sticky='ns')
         self.text_area3 = ttk.Entry(frame_settings,width=entry_width,bootstyle="info")
         self.text_area3.grid(row=0, column=5, padx=5, pady=5, sticky='nsew') 
         
-        other_Button2 = ttk.Button(frame_settings, text="交易记录", command=lambda:self.send_data(44444), width=button_width,bootstyle="primary").grid(row=1, column=6, padx=5, pady=5,sticky='ns')
-        #other_Button.pack(side = tk.RIGHT,padx=5,pady=5)
+        other_Button2   = ttk.Button(frame_settings, text="交易记录", command=lambda:self.send_data(44444), width=button_width,bootstyle="primary").grid(row=1, column=6, padx=5, pady=5,sticky='ns')
         self.text_area4 = ttk.Entry(frame_settings,width=entry_width,bootstyle="info")
         self.text_area4.grid(row=1, column=5, padx=5, pady=5, sticky='nsew')
         
@@ -184,7 +163,7 @@ class SerialAssistant:
 
         # 子总框上侧功能框
         frame_sub_func_height = 5
-        frame_sub_func = ttk.Frame(frame_comm_sub, width=frame_comm_sub_width,height=frame_sub_func_height,bootstyle="info")
+        frame_sub_func        = ttk.Frame(frame_comm_sub, width=frame_comm_sub_width,height=frame_sub_func_height,bootstyle="info")
         frame_sub_func.grid(row=0, column=0, padx=1, pady=1,sticky='nsew')
         frame_sub_func.grid_rowconfigure(0,weight=1)
         frame_sub_func.grid_columnconfigure(0, weight=1)   
@@ -201,7 +180,6 @@ class SerialAssistant:
         frame_bt.grid_rowconfigure(1,weight=1)
         frame_bt.grid_rowconfigure(2,weight=1)
         frame_bt.grid_columnconfigure(0, weight=1)
-        # frame_bt.
 
         # 创建并放置清除第一个文本框内容的按钮
         clear_button = ttk.Button(frame_bt, text="清除", command=lambda:self.clearAndSave_text(1),width=frame_bt_width,bootstyle="info")
@@ -268,7 +246,7 @@ class SerialAssistant:
 
         # 添加一个标签来显示第三个进度条的值
         self.progressbar3_value = tk.StringVar(value=f"UWB_R : {progressbar3.get():.1f}")
-        progressbar3_label = ttk.Label(frame_sub_lift, textvariable=self.progressbar3_value)
+        progressbar3_label      = ttk.Label(frame_sub_lift, textvariable=self.progressbar3_value)
         progressbar3_label.grid(row=2, column=0, padx=1, pady=1, sticky='nsew')
 
         # 更新第三个进度条标签的值
@@ -317,7 +295,7 @@ class SerialAssistant:
 
     def open_serial(self):
         try:
-            self.serial = serial.Serial(self.combo.get(), self.baudCombo.get(), timeout=1)
+            self.serial      = serial.Serial(self.combo.get(), self.baudCombo.get(), timeout=1)
             self.read_thread = threading.Thread(target=self.read_data)
             self.read_thread.start()
             self.serial_open = True
@@ -327,13 +305,13 @@ class SerialAssistant:
             self.text_box.insert(tk.END, f"打开串口失败: {e}\n")
 
     def close_serial(self):
-        if self.serial:
+        if self.serial: 
             self.serial.close()
             self.text_box.insert(tk.END, "串口已关闭\n")
 
             self.canvas.delete("all")       #清空画布
-            self.Master2SlverDistance = 0   #初始化闸间距,防止下次打开串口时，画图出错
-            self.serial_open = False
+            self.Master2SlverDistance = 0   #初始化闸间距, 防止下次打开串口时，画图出错
+            self.serial_open          = False
             self.update_serial_button()
                                                  
     # 清空or保存文本框内容
@@ -354,8 +332,8 @@ class SerialAssistant:
             messagebox.showinfo("tips","save file to root dir success!");
             
         elif flag == 4:
-            content = self.text_box2.get(1.0,tk.END)
-            filename = "Corr_content.csv";
+            content  = self.text_box2.get(1.0,tk.END)
+            filename = "Corr_content.csv"
             with open(filename,"w") as file:
                 file.write(content)
             messagebox.showinfo("tips","save file to root dir success!");
@@ -424,12 +402,15 @@ class SerialAssistant:
                         #获取用户下标，更新该用户的距离数据
                         
                         idx = int(data.split(':')[9].strip())   
-                        self.distance_list[idx]['MasterDistance'] = int(data.split(':')[1].strip())
-                        self.distance_list[idx]['SlaverDistance'] = int(data.split(':')[3].strip())
-                        self.distance_list[idx]['GateDistance'] = int(data.split(':')[5].strip())
-                        self.distance_list[idx]['nLos'] = int(data.split(':')[7].strip())
-                        self.distance_list[idx]['lift_deep'] = int(data.split(':')[11].strip())
-
+                        if 0 <= idx < len(self.distance_list):
+                            self.distance_list[idx]['MasterDistance'] = int(data.split(':')[1].strip())
+                            self.distance_list[idx]['SlaverDistance'] = int(data.split(':')[3].strip())
+                            self.distance_list[idx]['GateDistance']   = int(data.split(':')[5].strip())
+                            self.distance_list[idx]['nLos']           = int(data.split(':')[7].strip())
+                            self.distance_list[idx]['lift_deep']      = int(data.split(':')[11].strip())
+                        else:
+                            print(f"Index {idx} is out of range.")
+                            continue
                         self.text_box.insert(tk.END, "用户 " + str(idx) + "  |  " + "nLos: " + str(self.distance_list[idx]['nLos'])  +  "  |  " +"主,从,门:  " \
                                              + str(self.distance_list[idx]['MasterDistance']) + " ," + str(self.distance_list[idx]['SlaverDistance']) +" ,"  \
                                                 + str(self.distance_list[idx]['GateDistance']) + " <cm>" + "\n")
@@ -440,66 +421,68 @@ class SerialAssistant:
                             self.on_mode_change()
                     
                         if self.distance_list[idx]['MasterDistance'] != 0 and self.distance_list[idx]['SlaverDistance'] != 0 and self.distance_list[idx]['GateDistance'] !=0:
-                            #计算用户坐标
                             self.x = 400 + int(((self.distance_list[idx]['SlaverDistance']**2 - self.distance_list[idx]['MasterDistance']**2) / (2*self.distance_list[idx]['GateDistance'])))
-                            #异常值去除，防止开到负根
-                            # if abs(self.distance_list[idx]['MasterDistance']**2 - (self.x - (400 + self.distance_list[idx]['GateDistance']/2))**2) > 0:
                             self.y = int(math.sqrt(abs(self.distance_list[idx]['MasterDistance']**2 - (self.x - (400 + self.distance_list[idx]['GateDistance']/2))**2)))
-                            # Lift模式下，进行坐标映射
+                            
                             if self.modeCombo.get() == "LIFT":
-                                print("LIFT模式下,进行坐标映射")
                                 self.y = math.sqrt(abs(self.y**2 - 35*35))  
+
                             self.y = self.y + 60 
                             self.text_box2.insert(tk.END,f"<user,x,y> {idx} , {self.x-400:.0f} , {self.y-60:.0f}\n")
                             self.text_box2.see(tk.END)
                             
-                            self.distance_list[idx]['ZScoreFlag'] += 1
-                            
-                            self.distance_list[idx]['CoorX_Arr'] = np.append(self.distance_list[idx]['CoorX_Arr'],self.x)
-                            self.distance_list[idx]['CoorY_Arr'] = np.append(self.distance_list[idx]['CoorY_Arr'],self.y)                                                           
-                            #self.draw_user(self.CoorX_Arr[-1],self.CoorY_Arr[-1])                             
-                            
-                            if len(self.distance_list[idx]['CoorX_Arr']) == 20:                                                                
-                                
-                                #start_time = time.perf_counter()
-                                #异常值去除:Z-Score  ：每20轮调用一次，一次处理20组coornidate。保证所有数据都能被处理的同时，最大程度消减新coornidate移动带来的偏差。
-                                if self.distance_list[idx]['ZScoreFlag'] == len(self.distance_list[idx]['CoorX_Arr']):
-                                    self.distance_list[idx]['CoorX_Arr'] ,self.distance_list[idx]['CoorY_Arr'] = self.Z_Score(self.distance_list[idx]['CoorX_Arr'],self.distance_list[idx]['CoorY_Arr'])
-                                    self.distance_list[idx]['ZScoreFlag'] = 0
-                                
-                                if len(self.distance_list[idx]['CoorX_Arr']) < 20:
-                                    print('Z-Socre reduce some data,return.',len(self.distance_list[idx]['CoorX_Arr']))
-                                else:
-                                    #滤波:Moving-Average
-                                    self.distance_list[idx]['CoorX_Arr'] = self.moving_average(self.distance_list[idx]['CoorX_Arr'],2).astype(int)
-                                    self.distance_list[idx]['CoorY_Arr'] = self.moving_average(self.distance_list[idx]['CoorY_Arr'],2).astype(int)
-                                    
-                                    #创建回归曲线模型，预测用户坐标位置
-                                    self.predict_x,self.predict_y = self.predict_coor(self.distance_list[idx]['CoorX_Arr'],self.distance_list[idx]['CoorY_Arr'])
-                                    # self.text_box.insert(tk.END, "预测用户" + str(idx) + "位置..." + "\n")
-                                    # self.text_box.see(tk.END)
-                                    
-                                    #添加预测数据到数组末尾
-                                    self.distance_list[idx]['CoorX_Arr'] = np.append(self.distance_list[idx]['CoorX_Arr'],self.predict_x)    
-                                    self.distance_list[idx]['CoorY_Arr'] = np.append(self.distance_list[idx]['CoorY_Arr'],self.predict_y)
-                                    
-                                    #绘制用户坐标位置
-                                    
-                                    self.draw_user(self.distance_list,idx)  
-
-                                    
-                                    #删除一部分，添加新的运动趋势
-                                    self.distance_list[idx]['CoorX_Arr'] = np.delete(self.distance_list[idx]['CoorX_Arr'],[0])           
-                                    self.distance_list[idx]['CoorY_Arr'] = np.delete(self.distance_list[idx]['CoorY_Arr'],[0])
-                                                                                                                
-                                    #end_time = time.perf_counter()
-                                    #run_time = end_time - start_time
-
-                                    #print(f"绘制时间(不含搜集数据): {run_time} 秒")
+                            if self.Use_KF == True:
+                                #卡尔曼滤波方案
+                                self.cor = [self.x,self.y]
+                                user_kf  = self.distance_list[idx]['KF']
+                                z        = np.matrix(self.cor).T
+                                user_kf.predict()
+                                prediction = user_kf.update(z)
+                                prediction = prediction.T.tolist()[0]
+                                print("user %d prediction =:" % idx, prediction)
+                                self.distance_list[idx]["KF_predict"] = prediction
+                                self.draw_user_KF(self.distance_list[idx]["KF_predict"],idx)  
                             else:
-                                pass
-                            # else:
-                            #     print("距离数据有误,计算出Y为负数")
+                                #弹性网络方案
+                                self.distance_list[idx]['ZScoreFlag'] += 1
+                                self.distance_list[idx]['CoorX_Arr']   = np.append(self.distance_list[idx]['CoorX_Arr'],self.x)
+                                self.distance_list[idx]['CoorY_Arr']   = np.append(self.distance_list[idx]['CoorY_Arr'],self.y)
+                                
+                                if len(self.distance_list[idx]['CoorX_Arr']) == 20:                                                                
+                                    
+                                    #start_time = time.perf_counter()
+                                    #异常值去除:Z-Score  ：每20轮调用一次，一次处理20组coornidate。保证所有数据都能被处理的同时，最大程度消减新coornidate移动带来的偏差。
+                                    if self.distance_list[idx]['ZScoreFlag'] == len(self.distance_list[idx]['CoorX_Arr']):
+                                        self.distance_list[idx]['CoorX_Arr'] ,self.distance_list[idx]['CoorY_Arr'] = self.Z_Score(self.distance_list[idx]['CoorX_Arr'],self.distance_list[idx]['CoorY_Arr'])
+                                        self.distance_list[idx]['ZScoreFlag'] = 0
+                                    
+                                    if len(self.distance_list[idx]['CoorX_Arr']) < 20:
+                                        print('Z-Socre reduce some data,return.',len(self.distance_list[idx]['CoorX_Arr']))
+                                    else:
+                                        #滤波:Moving-Average
+                                        self.distance_list[idx]['CoorX_Arr'] = self.moving_average(self.distance_list[idx]['CoorX_Arr'],2).astype(int)
+                                        self.distance_list[idx]['CoorY_Arr'] = self.moving_average(self.distance_list[idx]['CoorY_Arr'],2).astype(int)
+                                        
+                                        #创建回归曲线模型，预测用户坐标位置
+                                        self.predict_x,self.predict_y = self.predict_coor(self.distance_list[idx]['CoorX_Arr'],self.distance_list[idx]['CoorY_Arr'])
+                                        
+                                        #添加预测数据到数组末尾
+                                        self.distance_list[idx]['CoorX_Arr'] = np.append(self.distance_list[idx]['CoorX_Arr'],self.predict_x)    
+                                        self.distance_list[idx]['CoorY_Arr'] = np.append(self.distance_list[idx]['CoorY_Arr'],self.predict_y)
+                                        
+                                        self.draw_user_EN(self.distance_list,idx)  
+
+                                        #删除一部分，添加新的运动趋势
+                                        self.distance_list[idx]['CoorX_Arr'] = np.delete(self.distance_list[idx]['CoorX_Arr'],[0])           
+                                        self.distance_list[idx]['CoorY_Arr'] = np.delete(self.distance_list[idx]['CoorY_Arr'],[0])
+                                                                                                                    
+                                        #end_time = time.perf_counter()
+                                        #run_time = end_time - start_time
+                                        #print(f"绘制时间(不含搜集数据): {run_time} 秒")
+                                else:
+                                    pass
+                        else:
+                            print("距离数据有误,计算出Y为负数")
             except serial.SerialException:
                 self.text_box.insert(tk.END, "串口连接已断开\n")
                 break
@@ -512,10 +495,10 @@ class SerialAssistant:
                 return True
         return False
 
-    def draw_user(self,user,idx):
+    def draw_user_EN(self,user,idx):
         colors = ['purple',  'teal','magenta', 'green', 'blue', 'yellow', 'orange', 'purple', 'pink', 'brown', 'gray', 'cyan', 'red', 'navy', 'maroon', \
                   'olive', 'lime', 'aqua', 'indigo' ,'plum']
-        tags = "user" + str(idx)
+        tags   = "user" + str(idx)
         self.canvas.delete(tags)
 
         #用户被遮挡，绘制扩展区域
@@ -533,6 +516,27 @@ class SerialAssistant:
         if len(user[idx]['CoorX_Arr']) > 0: 
                 self.canvas.create_oval(user[idx]['CoorX_Arr'][-1]-5, user[idx]['CoorY_Arr'][-1]-5, user[idx]['CoorX_Arr'][-1]+5, user[idx]['CoorY_Arr'][-1]+5,  \
                                         outline=colors[idx], fill=colors[idx],tags=("user" + str(idx)))
+    
+    def draw_user_KF(self,user,idx):
+        colors = ['purple',  'teal','magenta', 'green', 'blue', 'yellow', 'orange', 'purple', 'pink', 'brown', 'gray', 'cyan', 'red', 'navy', 'maroon', \
+                  'olive', 'lime', 'aqua', 'indigo' ,'plum']
+        tags   = "user" + str(idx)
+        self.canvas.delete(tags)
+
+        #用户被遮挡，绘制扩展区域
+        selected_mode = self.modeCombo.get()
+        if  selected_mode == "GATE":
+            if self.check_nLos() == True:  #只要有一个用户被遮挡，就绘制扩展区域
+                if not self.canvas.find_withtag("nLos"): #防止重复绘制
+                    self.canvas.create_arc(400-self.Master2SlverDistance/2 - 12.5, 60-self.Master2SlverDistance/2 -12.5, 400+self.Master2SlverDistance/2 + 12.5, \
+                                        60+self.Master2SlverDistance/2 +12.5, start=180, extent=180, fill='plum',outline="plum",tags="nLos") #FFA54F
+                    self.canvas.create_arc(400-self.Master2SlverDistance/2, 60-self.Master2SlverDistance/2, 400+self.Master2SlverDistance/2,  \
+                                        60+self.Master2SlverDistance/2, start=180, extent=180, fill='#FF6347',outline="#FF6347")
+            elif self.canvas.find_withtag("nLos"):
+                self.canvas.delete("nLos")
+
+            self.canvas.create_oval(user[0]-5, user[1]-5, user[0]+5, user[1]+5,  \
+                                    outline=colors[idx], fill=colors[idx],tags=("user" + str(idx)))
             
     def draw_basic(self):
         self.canvas.delete("all")
@@ -593,25 +597,23 @@ class SerialAssistant:
     def Z_Score(self,ArrX,ArrY):
         #print(f'arr_x len={len(ArrX)}, arr_y len={len(ArrY)}')
         threshold_x = 3
-        data = np.concatenate((ArrX[:, np.newaxis], ArrY[:, np.newaxis]), axis=1)
-        mean_x = np.mean(ArrX)
-        std_dev_x = np.std(ArrX)
-        z_scores_x = (ArrX - mean_x) / std_dev_x
+        data        = np.concatenate((ArrX[:, np.newaxis], ArrY[:, np.newaxis]), axis=1)
+        mean_x      = np.mean(ArrX)
+        std_dev_x   = np.std(ArrX)
+        z_scores_x  = (ArrX - mean_x) / std_dev_x
         #print(ArrX)
         #print(z_scores_x)
         
-        outliers_x = np.abs(z_scores_x) > threshold_x
+        outliers_x      = np.abs(z_scores_x) > threshold_x
         filtered_data_x = data[~outliers_x]
-        new_arr_x = filtered_data_x[:,0]
-        new_arr_y = filtered_data_x[:,1]
+        new_arr_x       = filtered_data_x[:,0]
+        new_arr_y       = filtered_data_x[:,1]
         #print(f'new_x len={len(new_arr_x)},new_y len={len(new_arr_y)}')
         if len(new_arr_x) < len(ArrX):
             print(f'delete corrdinate is :{data[outliers_x]}')
         
         return new_arr_x , new_arr_y
 
-
-    # 显示关于对话框
     def show_about(self):
         messagebox.showinfo("关于", "UwbCOM v2.0.1\n\n"
                              "版权所有 © 2024 可为有限公司\n"
@@ -627,13 +629,11 @@ class SerialAssistant:
         uwb_animation.start_animation()
 
 def main():
-    root = tk.Tk()
+    root   = tk.Tk()
     themes = ['cosmo', 'flatly', 'litera', 'minty', 'lumen', 'sandstone', 'yeti', 'pulse', 'united', 'morph', 'journal', 'darkly', 'superhero', \
               'solar', 'cyborg', 'vapor', 'simplex', 'cerculean']
-    style = ttk.Style("minty")    # "lumen" "minty" "sandstone"
-    # print(ttk.Style().theme_names())
-    
-    app = SerialAssistant(root)
+    style = ttk.Style("minty")
+    app   = SerialAssistant(root)
 
     def change_theme(theme_name):
         style.theme_use(theme_name)
@@ -653,7 +653,6 @@ def main():
     menubar.add_cascade(label="关于", menu=about_menu)
     about_menu.add_command(label="关于", command=app.show_about)
 
-    
     root.mainloop()
 
 if __name__ == "__main__":
