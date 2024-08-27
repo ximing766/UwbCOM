@@ -18,7 +18,7 @@ from KF_classify import KalmanFilter
 class SerialAssistant:
     def __init__(self, master):
         self.master = master
-        master.title("UwbCOM V2.0.5")
+        master.title("UwbCOM V2.0.7")
         self.master.minsize(800, 800)
         self.master.geometry("850x820")
         icon_path = os.path.join(os.path.dirname(__file__), 'UWB.ico')
@@ -59,7 +59,7 @@ class SerialAssistant:
         self.x                    = 0
         self.y                    = 0
         self.cor                  = []
-        self.Use_KF               = True                    #使用卡尔曼滤波器还是弹性网络
+        self.Use_KF               = False                    #使用卡尔曼滤波器还是弹性网络
 
         # 创建界面
         self.create_widgets()
@@ -292,7 +292,6 @@ class SerialAssistant:
         else:
             self.serial_bt.config(text="打开串口", command=self.open_serial,bootstyle="primary")
 
-
     def open_serial(self):
         try:
             self.serial      = serial.Serial(self.combo.get(), self.baudCombo.get(), timeout=1)
@@ -314,7 +313,6 @@ class SerialAssistant:
             self.serial_open          = False
             self.update_serial_button()
                                                  
-    # 清空or保存文本框内容
     def clearAndSave_text(self,flag):
         if flag == 1:
             self.text_box.delete(1.0, tk.END)
@@ -371,23 +369,31 @@ class SerialAssistant:
             self.flag_str = ""
         
         else:    #没有点击事件仍然收到了MOT则为红区，显示所有信息
-            cardNumber = data[210:320][:20]
+            cardNumber = int(data.split(':')[1].strip())
             self.text_area1.delete(0, tk.END)
             self.text_area1.insert(tk.END, cardNumber)     #卡号
-            validPeriod = data[210:320][20:36]  
-            self.text_area2.delete(0, tk.END)
-            self.text_area2.insert(tk.END, validPeriod)     #有效期
-            balance = int(data[210:320][48:52],16)
+            balance = int(data.split(':')[3].strip())
             self.text_area3.delete(0, tk.END)
             self.text_area3.insert(tk.END, str(balance / 100) + '￥')         #余额
-            transactionRecord = data[210:320][92:106]
-            self.text_area4.delete(0, tk.END)
-            self.text_area4.insert(tk.END, transactionRecord)       #交易记录
+            # cardNumber = data[210:320][:20]
+            # self.text_area1.delete(0, tk.END)
+            # self.text_area1.insert(tk.END, cardNumber)     #卡号
+            # validPeriod = data[210:320][20:36]  
+            # self.text_area2.delete(0, tk.END)
+            # self.text_area2.insert(tk.END, validPeriod)     #有效期
+            # balance = int(data[210:320][48:52],16)
+            # self.text_area3.delete(0, tk.END)
+            # self.text_area3.insert(tk.END, str(balance / 100) + '￥')         #余额
+            # transactionRecord = data[210:320][92:106]
+            # self.text_area4.delete(0, tk.END)
+            # self.text_area4.insert(tk.END, transactionRecord)       #交易记录
         
+    def change_filter(self,flag):
+        self.Use_KF = flag
 
     def read_data(self):
-        self.UserInfo = "@Qi"
-        self.CardInfoChar = "1E006F";
+        self.UserInfo = "@DISTANCE"
+        self.CardInfoChar = "@CARDINFO";
         while self.serial and self.serial.is_open:
             try:
                 data = self.serial.readline()
@@ -652,6 +658,13 @@ def main():
     about_menu = tk.Menu(menubar, tearoff=0)
     menubar.add_cascade(label="关于", menu=about_menu)
     about_menu.add_command(label="关于", command=app.show_about)
+
+    #滤波算法选择菜单
+    filter_menu = tk.Menu(menubar, tearoff=0)
+    menubar.add_cascade(label="滤波", menu=filter_menu)
+    kalman_filter_menu = filter_menu.add_command(label="Kalman-Filter", command=app.change_filter(True))
+    elasticnet_filter_menu = filter_menu.add_command(label="ElasticNet", command=app.change_filter(False))
+    
 
     root.mainloop()
 
