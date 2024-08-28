@@ -1,11 +1,13 @@
 
 import tkinter as tk
 import ttkbootstrap as ttk
+from ttkbootstrap.icons import Emoji 
 import serial
 import threading
 from tkinter import scrolledtext
 from tkinter import messagebox
 import serial.tools.list_ports
+from PIL import Image, ImageTk
 import math
 import os
 from sklearn.linear_model import LinearRegression
@@ -32,7 +34,7 @@ class SerialAssistant:
         self.bytesize     = serial.EIGHTBITS            
         self.parity       = serial.PARITY_NONE          
         self.stopbits     = serial.STOPBITS_ONE         
-
+        
         self.distance_list = [{
             "GateDistance"  : 0,
             "MasterDistance": 0,
@@ -43,23 +45,31 @@ class SerialAssistant:
             "nLos"          : 0,                      
             "lift_deep"     : 0,
             "KF"            : KalmanFilter(0.5, 2, 2), 
-            "KF_predict"    : [0, 0]  
+            "KF_predict"    : [0, 0],
         } for _ in range(20)]  
         #self.distance_list = [self.initial_dict.copy() for _ in range(20)]  #初始化20个用户的数据
 
         ## ** User Define ** ##
+        #Emoji._ITEMS[i].name                               "🤨"
+        print(Emoji._ITEMS[-20])
+        self.face = Emoji.get("winking face")
         self.init_draw            = 0                       #限制除用户外，其它图形多次作图
         self.flag_str             = ""                      #判断需要获取的卡信息种类
         self.Master2SlverDistance = 0;                      #画图用的闸间距
-
         self.radius               = 0                       #UWB初始扫描半径
         self.lift_deep            = 0                       #电梯深度
         self.lift_height          = 0                       #电梯高度
+        self.red_height           = 0
+        self.blue_height          = 150
 
         self.x                    = 0
         self.y                    = 0
         self.cor                  = []
         self.Use_KF               = False                    #使用卡尔曼滤波器还是弹性网络
+
+        #self.master.configure(background='pink')
+        self.image = tk.PhotoImage(file="background.png")
+        print(Emoji._ITEMS[-106:])
 
         # 创建界面
         self.create_widgets()
@@ -96,14 +106,14 @@ class SerialAssistant:
         frame_settings.grid_columnconfigure(4, weight=1)
         frame_settings.grid_columnconfigure(5, weight=1)
 
-        ttk.Label(frame_settings, text="COM:",bootstyle="danger").grid(row=0, column=0, padx=1, pady=5,sticky='w')
+        ttk.Label(frame_settings, text="COM" + Emoji._ITEMS[-106:][7].char,bootstyle="danger").grid(row=0, column=0, padx=1, pady=5,sticky='w')
         self.port_var = tk.StringVar()
 
         self.combo = ttk.Combobox(frame_settings, values=self.get_serial_ports(),bootstyle="primary")
         self.update_combobox()
         self.combo.grid(row=0, column=1, padx=1, pady=5,sticky='we')
 
-        ttk.Label(frame_settings, text="Baud:",bootstyle="danger").grid(row=1, column=0, padx=1, pady=5,sticky='w')
+        ttk.Label(frame_settings, text="Baud" + Emoji._ITEMS[-106:][-4].char,bootstyle="danger").grid(row=1, column=0, padx=1, pady=5,sticky='w')
         self.baudrate_var = tk.IntVar()
         
         self.baudCombo = ttk.Combobox(frame_settings,values=['115200','9600','3000000'],bootstyle="primary")
@@ -414,6 +424,11 @@ class SerialAssistant:
                             self.distance_list[idx]['GateDistance']   = int(data.split(':')[5].strip())
                             self.distance_list[idx]['nLos']           = int(data.split(':')[7].strip())
                             self.distance_list[idx]['lift_deep']      = int(data.split(':')[11].strip())
+                            if int(data.split(':')[13].strip()) != self.red_height or int(data.split(':')[15].strip()) != self.blue_height:
+                                self.red_height                           = int(data.split(':')[13].strip())
+                                self.blue_height                          = int(data.split(':')[15].strip())
+                                print(f"red_height: {self.red_height}  blue_height: {self.blue_height}")
+                                self.draw_basic();   
                         else:
                             print(f"Index {idx} is out of range.")
                             continue
@@ -512,10 +527,18 @@ class SerialAssistant:
         if  selected_mode == "GATE":
             if self.check_nLos() == True:  #只要有一个用户被遮挡，就绘制扩展区域
                 if not self.canvas.find_withtag("nLos"): #防止重复绘制
-                    self.canvas.create_arc(400-self.Master2SlverDistance/2 - 12.5, 60-self.Master2SlverDistance/2 -12.5, 400+self.Master2SlverDistance/2 + 12.5, \
-                                        60+self.Master2SlverDistance/2 +12.5, start=180, extent=180, fill='plum',outline="plum",tags="nLos") #FFA54F
-                    self.canvas.create_arc(400-self.Master2SlverDistance/2, 60-self.Master2SlverDistance/2, 400+self.Master2SlverDistance/2,  \
-                                        60+self.Master2SlverDistance/2, start=180, extent=180, fill='#FF6347',outline="#FF6347")
+                    if self.red_height == 0:
+                        self.canvas.create_arc(400-self.Master2SlverDistance/2 - 7.5, 60-self.Master2SlverDistance/2 -7.5, 400+self.Master2SlverDistance/2 + 7.5, \
+                                            60+self.Master2SlverDistance/2 +7.5, start=180, extent=180, fill='plum',outline="plum",tags="nLos") #FFA54F
+                        
+                        self.canvas.create_arc(400-self.Master2SlverDistance/2, 60-self.Master2SlverDistance/2, 400+self.Master2SlverDistance/2,  \
+                                            60+self.Master2SlverDistance/2, start=180, extent=180, fill='#FF6347',outline="#FF6347")
+                    else:
+                        self.canvas.create_arc(400-self.Master2SlverDistance/2 - 7.5, 60-self.red_height/2 -7.5, 400+self.Master2SlverDistance/2 + 7.5, \
+                                            60+self.red_height/2 +7.5, start=180, extent=180, fill='plum',outline="plum",tags="nLos") #FFA54F
+                        
+                        self.canvas.create_arc(400-self.Master2SlverDistance/2, 60-self.red_height/2, 400+self.Master2SlverDistance/2,  \
+                                            60+self.red_height/2, start=180, extent=180, fill='#FF6347',outline="#FF6347")
             elif self.canvas.find_withtag("nLos"):
                 self.canvas.delete("nLos")
 
@@ -524,8 +547,7 @@ class SerialAssistant:
                                         outline=colors[idx], fill=colors[idx],tags=("user" + str(idx)))
     
     def draw_user_KF(self,user,idx):
-        colors = ['purple',  'teal','magenta', 'green', 'blue', 'yellow', 'orange', 'purple', 'pink', 'brown', 'gray', 'cyan', 'red', 'navy', 'maroon', \
-                  'olive', 'lime', 'aqua', 'indigo' ,'plum']
+        colors = ['olive', 'lime', 'aqua', 'indigo' ,'plum','purple',  'teal','magenta', 'green', 'blue', 'yellow', 'orange', 'pink', 'brown', 'gray', 'cyan', 'red', 'navy', 'maroon']
         tags   = "user" + str(idx)
         self.canvas.delete(tags)
 
@@ -558,12 +580,16 @@ class SerialAssistant:
         if selected_mode == "GATE":
         # 绘制蓝区(矩形)   高度固定150
         # 左上角坐标[400-self.Master2SlverDistance/2,60] 右下角坐标[400+self.Master2SlverDistance/2,60+150]
-            self.canvas.create_rectangle(400-self.Master2SlverDistance/2, 60, 400+self.Master2SlverDistance/2, 60+150, width=1, outline="#4A90E2", fill="#4A90E2")
+            self.canvas.create_rectangle(400-self.Master2SlverDistance/2, 60, 400+self.Master2SlverDistance/2, 60+self.blue_height, width=1, outline="#4A90E2", fill="#4A90E2")
 
         # 绘制红区(半圆)  r=self.Master2SlverDistance/2  圆心(400,60)  
         # 左上角坐标(400-self.Master2SlverDistance/2,60-self.Master2SlverDistance/2)
         # 右下角坐标(400+self.Master2SlverDistance/2,60+self.Master2SlverDistance/2)
-            self.canvas.create_arc(400-self.Master2SlverDistance/2, 60-self.Master2SlverDistance/2, 400+self.Master2SlverDistance/2, 60+self.Master2SlverDistance/2, \
+            if self.red_height == 0:
+                self.canvas.create_arc(400-self.Master2SlverDistance/2, 60-self.Master2SlverDistance/2, 400+self.Master2SlverDistance/2, 60+self.Master2SlverDistance/2, \
+                                   start=180, extent=180, fill='#FF6347',outline="#FF6347")
+            else:
+                self.canvas.create_arc(400-self.Master2SlverDistance/2, 60-self.red_height/2, 400+self.Master2SlverDistance/2, 60+self.red_height/2, \
                                    start=180, extent=180, fill='#FF6347',outline="#FF6347")
         #self.canvas.create_text(360,300,text="坐标:")
         elif selected_mode == 'LIFT':
@@ -640,7 +666,7 @@ def main():
               'solar', 'cyborg', 'vapor', 'simplex', 'cerculean']
     style = ttk.Style("minty")
     app   = SerialAssistant(root)
-
+    print(style.theme_names())
     def change_theme(theme_name):
         style.theme_use(theme_name)
 
