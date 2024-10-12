@@ -20,7 +20,7 @@ from KF_classify import KalmanFilter
 class SerialAssistant:
     def __init__(self, master):
         self.master = master
-        master.title("UwbCOM V2.0.7")
+        master.title("UwbCOM V2.0.8")
         self.master.minsize(800, 800)
         self.master.geometry("850x820")
         icon_path = os.path.join(os.path.dirname(__file__), 'UWB.ico')
@@ -68,7 +68,6 @@ class SerialAssistant:
         self.Use_KF               = False                    #使用卡尔曼滤波器还是弹性网络
 
         #self.master.configure(background='pink')
-        self.image = tk.PhotoImage(file="background.png")
         print(Emoji._ITEMS[-106:])
 
         # 创建界面
@@ -651,7 +650,7 @@ class SerialAssistant:
                              "版权所有 © 2024 可为有限公司\n"
                              "Author: @QLL\n"
                              "Email: ximing766@gmail.com\n"
-                             )
+                            )
             
     def run_UWB_Lift_Animation_plan_1(self):
         uwb_animation = UWBLiftAnimationPlan1(radius=self.radius,lift_deep=self.lift_deep,lift_height=self.lift_height)

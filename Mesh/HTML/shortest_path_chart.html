@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Awesome-pyecharts</title>
+                <script type="text/javascript" src="https://assets.pyecharts.org/assets/v5/echarts.min.js"></script>
+            <script type="text/javascript" src="https://assets.pyecharts.org/assets/v5/themes/roma.js"></script>
+
+</head>
+<body >
+    <div id="f292b558a27542869ce3b0b5553276bf" class="chart-container" style="width:800px; height:800px; "></div>
+    <script>
+        var chart_f292b558a27542869ce3b0b5553276bf = echarts.init(
+            document.getElementById('f292b558a27542869ce3b0b5553276bf'), 'roma', {renderer: 'canvas'});
+        var option_f292b558a27542869ce3b0b5553276bf = {
+    "animation": true,
+    "animationThreshold": 2000,
+    "animationDuration": 1000,
+    "animationEasing": "cubicOut",
+    "animationDelay": 0,
+    "animationDurationUpdate": 300,
+    "animationEasingUpdate": "cubicOut",
+    "animationDelayUpdate": 0,
+    "aria": {
+        "enabled": false
+    },
+    "series": [
+        {
+            "type": "graph",
+            "layout": "force",
+            "symbolSize": 10,
+            "circular": {
+                "rotateLabel": false
+            },
+            "force": {
+                "repulsion": 5000,
+                "gravity": 0.2,
+                "edgeLength": 30,
+                "friction": 0.6,
+                "layoutAnimation": true
+            },
+            "label": {
+                "show": true,
+                "position": "right",
+                "margin": 8,
+                "formatter": "{b}"
+            },
+            "lineStyle": {
+                "show": true,
+                "width": 1,
+                "opacity": 1,
+                "curveness": 0,
+                "type": "solid"
+            },
+            "roam": true,
+            "draggable": false,
+            "focusNodeAdjacency": true,
+            "data": [
+                {
+                    "name": "A",
+                    "fixed": false,
+                    "category": 0,
+                    "symbolSize": 20,
+                    "emphasis": {},
+                    "blur": {},
+                    "select": {}
+                },
+                {
+                    "name": "B",
+                    "fixed": false,
+                    "category": 0,
+                    "symbolSize": 20,
+                    "emphasis": {},
+                    "blur": {},
+                    "select": {}
+                },
+                {
+                    "name": "C",
+                    "fixed": false,
+                    "category": 0,
+                    "symbolSize": 20,
+                    "emphasis": {},
+                    "blur": {},
+                    "select": {}
+                },
+                {
+                    "name": "D",
+                    "fixed": false,
+                    "category": 0,
+                    "symbolSize": 20,
+                    "emphasis": {},
+                    "blur": {},
+                    "select": {}
+                },
+                {
+                    "name": "E",
+                    "fixed": false,
+                    "category": 1,
+                    "symbolSize": 15,
+                    "emphasis": {},
+                    "blur": {},
+                    "select": {}
+                },
+                {
+                    "name": "F",
+                    "fixed": false,
+                    "category": 0,
+                    "symbolSize": 20,
+                    "emphasis": {},
+                    "blur": {},
+                    "select": {}
+                }
+            ],
+            "categories": [
+                {
+                    "name": "Shortest Path"
+                },
+                {
+                    "name": "others"
+                }
+            ],
+            "edgeLabel": {
+                "show": true,
+                "position": "middle",
+                "margin": 8,
+                "formatter": "{c}"
+            },
+            "edgeSymbol": [
+                null,
+                "arrow"
+            ],
+            "edgeSymbolSize": 10,
+            "links": [
+                {
+                    "source": "A",
+                    "target": "B",
+                    "value": 1,
+                    "lineStyle": {
+                        "color": "pink",
+                        "width": 3
+                    }
+                },
+                {
+                    "source": "A",
+                    "target": "C",
+                    "value": 4
+                },
+                {
+                    "source": "A",
+                    "target": "D",
+                    "value": 8
+                },
+                {
+                    "source": "A",
+                    "target": "F",
+                    "value": 8
+                },
+                {
+                    "source": "B",
+                    "target": "C",
+                    "value": 2,
+                    "lineStyle": {
+                        "color": "pink",
+                        "width": 3
+                    }
+                },
+                {
+                    "source": "B",
+                    "target": "D",
+                    "value": 5
+                },
+                {
+                    "source": "B",
+                    "target": "E",
+                    "value": 3
+                },
+                {
+                    "source": "C",
+                    "target": "D",
+                    "value": 1,
+                    "lineStyle": {
+                        "color": "pink",
+                        "width": 3
+                    }
+                },
+                {
+                    "source": "C",
+                    "target": "E",
+                    "value": 6
+                },
+                {
+                    "source": "D",
+                    "target": "E",
+                    "value": 2
+                },
+                {
+                    "source": "E",
+                    "target": "F",
+                    "value": 7
+                },
+                {
+                    "source": "F",
+                    "target": "A",
+                    "value": 9,
+                    "lineStyle": {
+                        "color": "pink",
+                        "width": 3
+                    }
+                }
+            ]
+        }
+    ],
+    "legend": [
+        {
+            "data": [
+                "Shortest Path",
+                "others"
+            ],
+            "selected": {},
+            "show": true,
+            "padding": 5,
+            "itemGap": 10,
+            "itemWidth": 25,
+            "itemHeight": 14,
+            "backgroundColor": "transparent",
+            "borderColor": "#ccc",
+            "borderRadius": 0,
+            "pageButtonItemGap": 5,
+            "pageButtonPosition": "end",
+            "pageFormatter": "{current}/{total}",
+            "pageIconColor": "#2f4554",
+            "pageIconInactiveColor": "#aaa",
+            "pageIconSize": 15,
+            "animationDurationUpdate": 800,
+            "selector": false,
+            "selectorPosition": "auto",
+            "selectorItemGap": 7,
+            "selectorButtonGap": 10
+        }
+    ],
+    "tooltip": {
+        "show": true,
+        "trigger": "item",
+        "triggerOn": "mousemove|click",
+        "axisPointer": {
+            "type": "line"
+        },
+        "showContent": true,
+        "alwaysShowContent": false,
+        "showDelay": 0,
+        "hideDelay": 100,
+        "enterable": false,
+        "confine": false,
+        "appendToBody": false,
+        "transitionDuration": 0.4,
+        "textStyle": {
+            "fontSize": 14
+        },
+        "borderWidth": 0,
+        "padding": 5,
+        "order": "seriesAsc"
+    },
+    "title": [
+        {
+            "show": true,
+            "text": "Shortest Path",
+            "target": "blank",
+            "subtarget": "blank",
+            "padding": 5,
+            "itemGap": 10,
+            "textAlign": "auto",
+            "textVerticalAlign": "auto",
+            "triggerEvent": false
+        }
+    ]
+};
+        chart_f292b558a27542869ce3b0b5553276bf.setOption(option_f292b558a27542869ce3b0b5553276bf);
+    </script>
+</body>
+</html>
