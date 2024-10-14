@@ -9,6 +9,7 @@ from tkinter import messagebox
 import serial.tools.list_ports
 from PIL import Image, ImageTk
 import math
+import queue
 import os
 from sklearn.linear_model import LinearRegression
 from sklearn.preprocessing import PolynomialFeatures
@@ -16,6 +17,8 @@ from sklearn.linear_model import ElasticNet
 import numpy as np
 from lift_uwb_dynamic_detect_plan import UWBLiftAnimationPlan1,UWBLiftAnimationPlan2
 from KF_classify import KalmanFilter
+from location.ultdoa_dynamic_location import CoordinatePlotter
+from location.Chan import ChanALG
 
 class SerialAssistant:
     def __init__(self, master):
@@ -62,6 +65,13 @@ class SerialAssistant:
         self.red_height           = 0
         self.blue_height          = 150
 
+        self.queue_com1           = queue.Queue()           #存储不同COM的ULTDOA数据, 默认com1为主Anchor
+        self.queue_com2           = queue.Queue()
+        self.queue_com3           = queue.Queue()
+        self.master_position      = []                      #主Anchor坐标
+        self.slave1_position     = []                      #从Anchor坐标
+        self.slave2_position     = []
+
         self.x                    = 0
         self.y                    = 0
         self.cor                  = []
@@ -73,6 +83,7 @@ class SerialAssistant:
         # 创建界面
         self.create_widgets()
 
+        #实时更新串口选择框
         self.update_combobox_periodically()
     
     def get_serial_ports(self):
@@ -125,7 +136,7 @@ class SerialAssistant:
         self.serial_bt = ttk.Button(frame_settings, text="打开串口", command=self.open_serial, width=button_width,bootstyle="primary")
         self.serial_bt.grid(row=0, column=2, padx=5, pady=5,sticky='ns')
 
-        self.modeCombo = ttk.Combobox(frame_settings,values=['GATE','LIFT'],width=button_width,bootstyle="primary")
+        self.modeCombo = ttk.Combobox(frame_settings,values=['GATE','LIFT','UL-TDOA','DL-TDOA'],width=button_width,bootstyle="primary")
         self.modeCombo.current(0)
         self.modeCombo.grid(row=1, column=2, padx=5, pady=5,sticky='ns')
         self.modeCombo.bind("<<ComboboxSelected>>", self.on_mode_change)
@@ -399,7 +410,22 @@ class SerialAssistant:
         
     def change_filter(self,flag):
         self.Use_KF = flag
-
+    
+    #ULTDOA方案数据处理函数
+    def UL_read_data(self,port,baudrate,queue):
+        ser = serial.Serial(port, baudrate, timeout=1)
+        while True:
+            try:
+                if ser.in_waiting > 0:
+                    data = ser.readline().decode('utf-8').strip()
+                    # 将数据添加到队列中，以便在主线程中更新UI
+                    queue.put(data)
+            except serial.SerialException as e:
+                print(f"Error reading from {port}: {e}")
+                break
+        pass
+    
+    #TWR方案数据处理函数
     def read_data(self):
         self.UserInfo = "@DISTANCE"
         self.CardInfoChar = "@CARDINFO";
@@ -564,7 +590,7 @@ class SerialAssistant:
 
             self.canvas.create_oval(user[0]-5, user[1]-5, user[0]+5, user[1]+5,  \
                                     outline=colors[idx], fill=colors[idx],tags=("user" + str(idx)))
-            
+    
     def draw_basic(self):
         self.canvas.delete("all")
         # 绘制闸机(left)  以400为x原点，右下角坐标:[400-self.Master2SlverDistance/2,60]  左上角坐标[(400-self.Master2SlverDistance/2-30),10]
@@ -595,9 +621,110 @@ class SerialAssistant:
             self.canvas.create_rectangle(400-self.Master2SlverDistance/2, 60, 400+self.Master2SlverDistance/2, 60+self.distance_list[0]['lift_deep'], \
                                          width=1, outline="#4A90E2", fill="#4A90E2")
         self.init_draw = 1
-    def on_mode_change(self,event=None):
-        self.draw_basic();              
 
+    def startULTDOA(self):
+        thread_com1 = threading.Thread(target=self.UL_read_data, args=('COM3', 3000000, self.queue_com1))
+        thread_com2 = threading.Thread(target=self.UL_read_data, args=('COM4', 3000000, self.queue_com2))
+        thread_com3 = threading.Thread(target=self.UL_read_data, args=('COM5', 3000000, self.queue_com3))
+
+        thread_com1.daemon = True  # 设置为守护线程
+        thread_com2.daemon = True  # 设置为守护线程
+        thread_com3.daemon = True  # 设置为守护线程
+
+        thread_com1.start()
+        thread_com2.start()
+        thread_com3.start()
+
+        self.update_location()
+        pass
+
+    def on_mode_change(self,event=None):
+        selected_mode = self.modeCombo.get()
+        if selected_mode == "UL-TDOA":
+
+            self.open_coordinate_settings()   #init settings
+            # startULTDOA()                   #update location
+
+        elif selected_mode == "DL-TDOA":
+            messagebox.showinfo("Tips", "功能待开发")
+            pass    
+        else:
+            self.draw_basic();              
+    
+    def open_coordinate_settings(self):
+        settings_window = tk.Toplevel()  # 创建新的Toplevel窗口
+        settings_window.title("Settings")
+        settings_window.geometry("500x200")  # 设置窗口大小
+
+        # 在设置窗口中添加一些设置选项
+        ttk.Label(settings_window, text="Master_X:"+ Emoji._ITEMS[-106:][7].char,bootstyle = "danger").grid(row=0, column=0)
+        Master_X = tk.StringVar()
+        Master_X.set(5)  # 默认值
+        ttk.Entry(settings_window, textvariable=Master_X,bootstyle = "info").grid(row=0, column=1)
+
+        ttk.Label(settings_window, text="Master_Y:"+ Emoji._ITEMS[-106:][7].char,bootstyle = "danger").grid(row=0, column=2)
+        Master_Y = tk.StringVar()
+        Master_Y.set(1)  # 默认值
+        ttk.Entry(settings_window, textvariable=Master_Y,bootstyle = "info").grid(row=0, column=3)
+
+        ttk.Label(settings_window, text="Slave1_X:"+ Emoji._ITEMS[-106:][7].char,bootstyle = "danger").grid(row=1, column=0)
+        Slave1_X = tk.IntVar()
+        Slave1_X.set(-2)  # 默认值
+        ttk.Entry(settings_window, textvariable=Slave1_X,bootstyle = "info").grid(row=1, column=1)
+
+        ttk.Label(settings_window, text="Slave1_Y:"+ Emoji._ITEMS[-106:][7].char,bootstyle = "danger").grid(row=1, column=2)
+        Slave1_Y = tk.IntVar()
+        Slave1_Y.set(7)  # 默认值
+        ttk.Entry(settings_window, textvariable=Slave1_Y,bootstyle = "info").grid(row=1, column=3)
+
+        ttk.Label(settings_window, text="Slave2_X:"+ Emoji._ITEMS[-106:][7].char,bootstyle = "danger").grid(row=2, column=0)
+        Slave2_X = tk.IntVar()
+        Slave2_X.set(10)  # 默认值
+        ttk.Entry(settings_window, textvariable=Slave2_X,bootstyle = "info").grid(row=2, column=1)
+
+        ttk.Label(settings_window, text="Slave2_Y:"+ Emoji._ITEMS[-106:][7].char,bootstyle = "danger").grid(row=2, column=2)
+        Slave2_Y = tk.IntVar()
+        Slave2_Y.set(7)  # 默认值
+        ttk.Entry(settings_window, textvariable=Slave2_Y,bootstyle = "info").grid(row=2, column=3)
+
+        # 保存锚点坐标
+        def save_settings():
+            self.master_position = (int(Master_X.get()), int(Master_Y.get()))
+            self.slave1_position = (int(Slave1_X.get()), int(Slave1_Y.get()))
+            self.slave2_position = (int(Slave2_X.get()), int(Slave2_Y.get()))
+            messagebox.showinfo("Settings Saved", f"Master_X: {Master_X.get()}, Master_Y: {Master_Y.get()},Slave1_X: {Slave1_X.get()}, Slave1_Y: {Slave1_Y.get()},Slave2_X: {Slave2_X.get()}, Slave2_Y: {Slave2_Y.get()}")
+            settings_window.destroy()
+            
+            #创建锚点坐标图
+            TagInstance = CoordinatePlotter(self.master_position,self.slave1_position, self.slave2_position)
+            TagInstance.plot_coordinates()
+
+        ttk.Button(settings_window, text="Save", command=save_settings, bootstyle="success").grid(row=4, column=2)
+
+    def update_location(self):
+        try:
+            data_master = self.queue_com1.get_nowait()
+            data_slave1 = self.queue_com2.get_nowait()
+            data_slave2 = self.queue_com3.get_nowait()
+
+            if data_master is not None and data_slave1 is not None and data_slave2 is not None:
+                self.text_box.insert(tk.END,f"<Master:> {data_master} , <Slave1:> {data_slave1} , <Slave2:> {data_slave2} \n")
+                self.text_box.see(tk.END)
+
+                self.cacl_timediff(data_master,data_slave1,data_slave2)       #计算时间差
+                self.chan_2D(self.x,self.y)                                   #计算坐标
+
+                self.draw_ULTDOA_Location(self.x,self.y)       #TODO 这儿应该是触发式更新图中坐标，而不是每次创建
+        except queue.Empty:
+            pass
+
+        self.master.after(250, self.update_location)
+        pass
+    
+    def cacl_timediff(self,data_master,data_slve1,data_slave2):
+        pass
+    def draw_ULTDOA_Location(self,x,y):
+        pass
     #处理坐标数组，输出预测坐标
     def predict_coor(self,CoorX_Arr,CoorY_Arr):
         

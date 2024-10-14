@@ -5,41 +5,45 @@ from numpy.linalg import *
 from matplotlib.ticker import MultipleLocator, FormatStrFormatter
 import matplotlib.pyplot as plt 
 
+class ChanALG:
+    def __init__(self, ri_1, X, Q):
+        self.ri_1 = ri_1
+        self.X = X
+        self.Q = Q
 
+    def chan_location(self):
+        n = len(self.X)
+        k = (self.X**2).sum(1)  # 将数组各原始平方后按列求和
+        h = 0.5 * (self.ri_1**2 - k[1:n] + k[0])
+        Ga = []
+        for i in range(1, n):
+            Ga.append([self.X[i][0] - self.X[0][0], self.X[i][1] - self.X[0][1], self.ri_1[i-1]])
+        Ga = np.array(Ga)
+        Ga = -Ga
 
-def chan_location(ri_1, X, Q):
-    n = len(X)
-    k = (X**2).sum(1)  # 将数组各原始平方后按列求和
-    h = 0.5 * (ri_1**2 - k[1:n] + k[0])
-    Ga = []
-    for i in range(1, n):
-        Ga.append([X[i][0] - X[0][0], X[i][1] - X[0][1], ri_1[i-1]])
-    Ga = np.array(Ga)
-    Ga = -Ga
-
-    # 第一次WLS估计结果（远距算法）
-    Za = inv((Ga.T).dot(inv(Q)).dot(Ga)).dot((Ga.T).dot(inv(Q)).dot(h))
-	
-    # 第一次WLS计算（近距算法）
-    r = np.sqrt(((X[1:n] - Za[0:2])**2).sum(1))
-    B = np.diag(r)   
-    Fa = B.dot(Q).dot(B)
-    Za1 = inv((Ga.T).dot(inv(Fa)).dot(Ga)).dot((Ga.T)).dot(inv(Fa)).dot(h)
-    Za_cov = inv( (Ga.T).dot(inv(Fa)).dot(Ga) )
-	
-    # 第二次WLS计算（近距算法）
-    Ga1 = np.array([[1,0], [0,1], [1,1]])
-    h1 = np.array([(Za1[0] - X[0][0])**2, (Za1[1] - X[0][1])**2, Za1[2]**2])
-    B1 = np.diag([Za1[0] - X[0][0], Za1[1]-X[0][1], Za1[2]])
-    Fa1 = 4 * (B1).dot(Za_cov).dot(B1)
-    Za2 = inv((Ga1.T).dot(inv(Fa1)).dot(Ga1)).dot((Ga1.T)).dot(inv(Fa1)).dot(h1)
-    
-    pos1 = np.sqrt(Za2) + X[0];
-    pos2 = -np.sqrt(Za2) + X[0];
-    pos3 = [np.sqrt(Za2[0]), -np.sqrt(Za2[1])] + X[0]
-    pos4 = [-np.sqrt(Za2[0]), np.sqrt(Za2[1])] + X[0]
-    pos = [pos1, pos2]#, pos3, pos4]
-    return pos
+        # 第一次WLS估计结果（远距算法）
+        Za = inv((Ga.T).dot(inv(self.Q)).dot(Ga)).dot((Ga.T).dot(inv(self.Q)).dot(h))
+        
+        # 第一次WLS计算（近距算法）
+        r = np.sqrt(((self.X[1:n] - Za[0:2])**2).sum(1))
+        B = np.diag(r)   
+        Fa = B.dot(self.Q).dot(B)
+        Za1 = inv((Ga.T).dot(inv(Fa)).dot(Ga)).dot((Ga.T)).dot(inv(Fa)).dot(h)
+        Za_cov = inv( (Ga.T).dot(inv(Fa)).dot(Ga) )
+        
+        # 第二次WLS计算（近距算法）
+        Ga1 = np.array([[1,0], [0,1], [1,1]])
+        h1 = np.array([(Za1[0] - self.X[0][0])**2, (Za1[1] - self.X[0][1])**2, Za1[2]**2])
+        B1 = np.diag([Za1[0] - self.X[0][0], Za1[1]-self.X[0][1], Za1[2]])
+        Fa1 = 4 * (B1).dot(Za_cov).dot(B1)
+        Za2 = inv((Ga1.T).dot(inv(Fa1)).dot(Ga1)).dot((Ga1.T)).dot(inv(Fa1)).dot(h1)
+        
+        pos1 = np.sqrt(Za2) + self.X[0];
+        pos2 = -np.sqrt(Za2) + self.X[0];
+        pos3 = [np.sqrt(Za2[0]), -np.sqrt(Za2[1])] + self.X[0]
+        pos4 = [-np.sqrt(Za2[0]), np.sqrt(Za2[1])] + self.X[0]
+        pos = [pos1, pos2]#, pos3, pos4]
+        return pos
 
 def drawPtTest(pos, tag, X):
     
@@ -81,7 +85,8 @@ def test():
     ri_1 = np.array(ri_1)
     print("distance diff :",ri_1)
     print("Anchor points :",X)
-    pos = chan_location(ri_1, X, Q)  # 最终对比，从中选出一个正确的定位点
+    ChanINS = ChanALG(ri_1, X, Q)
+    pos = ChanINS.chan_location()  # 最终对比，从中选出一个正确的定位点
     drawPtTest(pos, T, X)
     
     # 打印结果

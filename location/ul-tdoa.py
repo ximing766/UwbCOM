@@ -48,8 +48,8 @@ text_com2 = tk.Text(root, height=10, width=40)
 text_com2.pack()
 
 # 启动数据接收的线程
-thread_com1 = threading.Thread(target=read_data, args=('COM1', 9600, queue_com1))
-thread_com2 = threading.Thread(target=read_data, args=('COM2', 9600, queue_com2))
+thread_com1 = threading.Thread(target=read_data, args=('COM3', 3000000, queue_com1))
+thread_com2 = threading.Thread(target=read_data, args=('COM4', 3000000, queue_com2))
 
 thread_com1.daemon = True  # 设置为守护线程
 thread_com2.daemon = True  # 设置为守护线程
