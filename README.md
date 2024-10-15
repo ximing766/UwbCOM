@@ -1,32 +1,46 @@
 # UwbCOM
 
-UWB串口助手
+**UWB串口助手**
 
-# APP生成步骤
+# exe生成步骤
 
-1：需要进入myenv虚拟环境，否则没有相关包（该环境下exe太大，希望更小则再进入uwbenv）。
+1：需要进入myenv虚拟环境(执行下方指令1)，否则没有相关包（该环境下exe太大，希望更小则再进入uwbenv,工程路径下执行下方指令2）。
 
-activate myenv；
+```
+ activate myenv；
+```
 
+```
 uwbenv\Scripts\activate
+```
 
 2：执行
 
-pyinstaller --noconsole --onefile -i UWB.ico --add-data "UWB.ico;." --name "UwbCOM_V2.0.2" UwbCOM.py
+```
+pyinstaller --noconsole --onefile -i UWB.ico --add-data "UWB.ico;." --name "UwbCOM_V1.0" UwbCOM.py
+```
 
-3：若失败，在生成的spec添加一行
+3：若失败，在生成的spec添加一行后执行4
 
+```
 import sys ; sys.setrecursionlimit(sys.getrecursionlimit() * 5)
+```
 
 4:使用下方命令安装
 
+```
 pyinstaller UwbCOM.spec 
+```
 
-注：此方法生成的exe文件很大，pyinstaller会将很多无关的库一起打包，解决方法为使用venv创建一个全新的虚拟环境，安装相关依赖包后，在venv中使用pyinstaller安装。
+
 
 # 简介
 
-UWB的串口GUI工具，显示用户位置
+UWB的串口GUI工具，显示用户位置。
+
+- 目前支持TWR的GATE和LIFT两种方案下定位
+- 提供了UL-TDOA的demo
+- 提供了LIFT方案的两种演示
 
 # V1.1
 

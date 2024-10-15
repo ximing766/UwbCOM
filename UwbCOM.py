@@ -24,7 +24,7 @@ from location.Chan import ChanALG
 class SerialAssistant:
     def __init__(self, master):
         self.master = master
-        master.title("UwbCOM V2.0.8")
+        master.title("UwbCOM V1.0")
         self.master.minsize(800, 800)
         self.master.geometry("850x820")
         icon_path = os.path.join(os.path.dirname(__file__), 'UWB.ico')
@@ -815,7 +815,7 @@ class SerialAssistant:
         return new_arr_x , new_arr_y
 
     def show_about(self):
-        messagebox.showinfo("关于", "UwbCOM v2.0.1\n\n"
+        messagebox.showinfo("关于", "UwbCOM v1.0\n\n"
                              "版权所有 © 2024 可为有限公司\n"
                              "Author: @QLL\n"
                              "Email: ximing766@gmail.com\n"
