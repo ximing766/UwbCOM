@@ -9,6 +9,7 @@ from tkinter import messagebox
 import serial.tools.list_ports
 from PIL import Image, ImageTk
 import math
+import random
 import queue
 import os
 from sklearn.linear_model import LinearRegression
@@ -64,13 +65,16 @@ class SerialAssistant:
         self.lift_height          = 0                       #电梯高度
         self.red_height           = 0
         self.blue_height          = 150
-
+        
         self.queue_com1           = queue.Queue()           #存储不同COM的ULTDOA数据, 默认com1为主Anchor
         self.queue_com2           = queue.Queue()
         self.queue_com3           = queue.Queue()
+        self.DSi_M                = []                      #Slver_i到Master的距离
+        self.Q                    = []                      #Q值
+        self.Anchor_position      = []                      #所有点坐标
         self.master_position      = []                      #主Anchor坐标
-        self.slave1_position     = []                      #从Anchor坐标
-        self.slave2_position     = []
+        self.slave1_position      = []                      #从Anchor坐标
+        self.slave2_position      = []
 
         self.x                    = 0
         self.y                    = 0
@@ -623,18 +627,23 @@ class SerialAssistant:
         self.init_draw = 1
 
     def startULTDOA(self):
-        thread_com1 = threading.Thread(target=self.UL_read_data, args=('COM3', 3000000, self.queue_com1))
-        thread_com2 = threading.Thread(target=self.UL_read_data, args=('COM4', 3000000, self.queue_com2))
-        thread_com3 = threading.Thread(target=self.UL_read_data, args=('COM5', 3000000, self.queue_com3))
+        # thread_com1 = threading.Thread(target=self.UL_read_data, args=('COM3', 3000000, self.queue_com1))
+        # thread_com2 = threading.Thread(target=self.UL_read_data, args=('COM4', 3000000, self.queue_com2))
+        # thread_com3 = threading.Thread(target=self.UL_read_data, args=('COM5', 3000000, self.queue_com3))
 
-        thread_com1.daemon = True  # 设置为守护线程
-        thread_com2.daemon = True  # 设置为守护线程
-        thread_com3.daemon = True  # 设置为守护线程
+        # thread_com1.daemon = True  # 设置为守护线程
+        # thread_com2.daemon = True  # 设置为守护线程
+        # thread_com3.daemon = True  # 设置为守护线程
 
-        thread_com1.start()
-        thread_com2.start()
-        thread_com3.start()
+        # thread_com1.start()
+        # thread_com2.start()
+        # thread_com3.start()
 
+        #创建锚点坐标图
+        self.TagInstance = CoordinatePlotter(self.master_position,self.slave1_position, self.slave2_position)
+        self.TagInstance.plot_coordinates()
+        self.TagInstance.add_new_point([0,0],'blue','D','Tag')
+        
         self.update_location()
         pass
 
@@ -642,14 +651,72 @@ class SerialAssistant:
         selected_mode = self.modeCombo.get()
         if selected_mode == "UL-TDOA":
 
-            self.open_coordinate_settings()   #init settings
-            # startULTDOA()                   #update location
-
+            self.open_coordinate_settings()          #init settings
+            
         elif selected_mode == "DL-TDOA":
             messagebox.showinfo("Tips", "功能待开发")
             pass    
         else:
-            self.draw_basic();              
+            self.draw_basic();      
+
+    def update_location(self):
+        # try:
+        #     data_master = self.queue_com1.get_nowait()
+        #     data_slave1 = self.queue_com2.get_nowait()
+        #     data_slave2 = self.queue_com3.get_nowait()
+
+        #     if data_master is not None and data_slave1 is not None and data_slave2 is not None:
+        #         self.text_box.insert(tk.END,f"<Master:> {data_master} , <Slave1:> {data_slave1} , <Slave2:> {data_slave2} \n")
+        #         self.text_box.see(tk.END)
+
+        #         self.DSi_M = self.cacl_timediff(data_master,data_slave1,data_slave2)       #计算时间差
+        #         ChanINS = ChanALG(self.DSi_M,self.Anchor_position,self.Q)
+        #         self.x,self.y = ChanINS.chan_location()
+
+        #         self.draw_ULTDOA_Location(self.x,self.y)       #TODO 这儿应该是触发式更新图中坐标，而不是每次创建
+        # except queue.Empty:
+        #     pass
+        self.x = random.randint(1,12)
+        self.y = random.randint(1,12)
+        self.TagInstance.update_point(4,[self.x,self.y])
+        
+        self.master.after(200, self.update_location)
+    
+    def cacl_timediff(self,data_master,data_slave1,data_slave2):
+        c = 299792458
+        SYNC2_tx        = data_slave1[3]
+        SYNC1_tx        = data_slave1[1]
+        SYNC1_S1_rx     = data_slave1[2]
+        SYNC2_S1_rx     = data_slave1[4]
+        SYNC1_S2_rx     = data_slave2[2]
+        SYNC2_S2_rx     = data_slave2[4]
+        Master_blink_rx = data_master[0]
+        Slave1_blink_rx = data_slave1[0]
+        Slave2_blink_rx = data_slave2[0]
+
+        Ref_MA                 = (SYNC2_tx + SYNC1_tx) / 2
+        Propagation_delay_S1_M = (self.DSi_M[0] / c) * (15.65 ** -12)
+        Propagation_delay_S2_M = (self.DSi_M[1] / c) * (15.65 ** -12)
+        Ref_SA1                = ((SYNC2_S1_rx + SYNC1_S1_rx) / 2) - Propagation_delay_S1_M
+        Ref_SA2                = ((SYNC2_S2_rx + SYNC1_S2_rx) / 2) - Propagation_delay_S2_M
+
+        SFO_MA_S1 = ((SYNC2_tx - SYNC1_tx) - (SYNC2_S1_rx - SYNC1_S1_rx)) / (SYNC2_tx - SYNC1_tx)
+        SFO_MA_S2 = ((SYNC2_tx - SYNC1_tx) - (SYNC2_S2_rx - SYNC1_S2_rx)) / (SYNC2_tx - SYNC1_tx)
+
+        MA_S1_common_base_timestamp = (Master_blink_rx - Ref_MA) * (1 - SFO_MA_S1)
+        MA_S2_common_base_timestamp = (Master_blink_rx - Ref_MA) * (1 - SFO_MA_S2)
+        S1_common_base_timestamp    = Slave1_blink_rx - Ref_SA1
+        S2_common_base_timestamp    = Slave2_blink_rx - Ref_SA2
+
+        TDOA_MA_S1 = MA_S1_common_base_timestamp - S1_common_base_timestamp      #时间差
+        TDOA_MA_S2 = MA_S2_common_base_timestamp - S2_common_base_timestamp
+
+        TDOA_MA_S1 *= c       #距离差
+        TDOA_MA_S2 *= c
+
+        return [TDOA_MA_S1,TDOA_MA_S2]
+
+          
     
     def open_coordinate_settings(self):
         settings_window = tk.Toplevel()  # 创建新的Toplevel窗口
@@ -692,39 +759,14 @@ class SerialAssistant:
             self.master_position = (int(Master_X.get()), int(Master_Y.get()))
             self.slave1_position = (int(Slave1_X.get()), int(Slave1_Y.get()))
             self.slave2_position = (int(Slave2_X.get()), int(Slave2_Y.get()))
+            self.Anchor_position = [self.master_position,self.slave1_position,self.slave2_position]
             messagebox.showinfo("Settings Saved", f"Master_X: {Master_X.get()}, Master_Y: {Master_Y.get()},Slave1_X: {Slave1_X.get()}, Slave1_Y: {Slave1_Y.get()},Slave2_X: {Slave2_X.get()}, Slave2_Y: {Slave2_Y.get()}")
             settings_window.destroy()
             
-            #创建锚点坐标图
-            TagInstance = CoordinatePlotter(self.master_position,self.slave1_position, self.slave2_position)
-            TagInstance.plot_coordinates()
-
+            self.startULTDOA()                       #update location
         ttk.Button(settings_window, text="Save", command=save_settings, bootstyle="success").grid(row=4, column=2)
 
-    def update_location(self):
-        try:
-            data_master = self.queue_com1.get_nowait()
-            data_slave1 = self.queue_com2.get_nowait()
-            data_slave2 = self.queue_com3.get_nowait()
-
-            if data_master is not None and data_slave1 is not None and data_slave2 is not None:
-                self.text_box.insert(tk.END,f"<Master:> {data_master} , <Slave1:> {data_slave1} , <Slave2:> {data_slave2} \n")
-                self.text_box.see(tk.END)
-
-                self.cacl_timediff(data_master,data_slave1,data_slave2)       #计算时间差
-                self.chan_2D(self.x,self.y)                                   #计算坐标
-
-                self.draw_ULTDOA_Location(self.x,self.y)       #TODO 这儿应该是触发式更新图中坐标，而不是每次创建
-        except queue.Empty:
-            pass
-
-        self.master.after(250, self.update_location)
-        pass
     
-    def cacl_timediff(self,data_master,data_slve1,data_slave2):
-        pass
-    def draw_ULTDOA_Location(self,x,y):
-        pass
     #处理坐标数组，输出预测坐标
     def predict_coor(self,CoorX_Arr,CoorY_Arr):
         

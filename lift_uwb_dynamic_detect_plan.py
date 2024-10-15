@@ -96,7 +96,7 @@ class UWBLiftAnimationPlan1:
         self.min_sum = float('inf')
         self.update(0)
 
-    def update(self, num):
+    def update(self, num):  #num由系统给，为帧编号，每次加1
         if self.paused and self.slider_change == False:
             return self.line, self.line1, self.line2, self.patch, self.overlap_patch, self.non_overlap_text, self.overlap_text, self.min_sum_text, self.min_sum_intersections_text
         self.slider_change = False

@@ -1,36 +1,109 @@
-import tkinter as tk
-from tkinter import messagebox
+import dash
+from dash import dcc, html
+from dash.dependencies import Input, Output,State
+import plotly.graph_objects as go
 
-# 设置窗口的函数
-def open_settings():
-    settings_window = tk.Toplevel()  # 创建新的Toplevel窗口
-    settings_window.title("Settings")
+class Scatter3DPlotter:
+    def __init__(self, coords):
+        self.coords = coords
+        self.fig = self.create_figure()
 
-    # 在设置窗口中添加一些设置选项
-    tk.Label(settings_window, text="COM Port:").grid(row=0, column=0)
-    com_port_var = tk.StringVar()
-    com_port_var.set("COM1")  # 默认值
-    tk.Entry(settings_window, textvariable=com_port_var).grid(row=0, column=1)
+    def create_figure(self):
+        x_coords = [coord[0] for coord in self.coords]
+        y_coords = [coord[1] for coord in self.coords]
+        z_coords = [coord[2] for coord in self.coords]
 
-    tk.Label(settings_window, text="Baud Rate:").grid(row=1, column=0)
-    baud_rate_var = tk.IntVar()
-    baud_rate_var.set(9600)  # 默认值
-    tk.Entry(settings_window, textvariable=baud_rate_var).grid(row=1, column=1)
+        self.fig = go.Figure(data=[go.Scatter3d(
+            x=x_coords,
+            y=y_coords,
+            z=z_coords,
+            mode='markers',
+            marker=dict(
+                size=5,
+                color='blue',
+                opacity=0.8
+            )
+        )])
 
-    # 添加一个保存按钮，用于保存设置
-    def save_settings():
-        # 这里可以添加保存设置的代码
-        messagebox.showinfo("Settings Saved", f"COM Port: {com_port_var.get()}, Baud Rate: {baud_rate_var.get()}")
-        settings_window.destroy()  # 关闭设置窗口
+        self.fig.update_layout(
+            title='3D Scatter Plot',
+            scene=dict(
+                xaxis_title='X Axis',
+                yaxis_title='Y Axis',
+                zaxis_title='Z Axis'
+            ),
+            margin=dict(
+                l=0,
+                r=0,
+                b=0,
+                t=0
+            )
+        )
 
-    tk.Button(settings_window, text="Save", command=save_settings).grid(row=2, column=0, columnspan=2)
+        return self.fig
 
-# 主窗口
-root = tk.Tk()
-root.title("Main Window")
+    def add_point(self, new_point):
+        self.coords.append(new_point)
+        new_trace = go.Scatter3d(
+            x=[self.coords[-1][0]],
+            y=[self.coords[-1][1]],
+            z=[self.coords[-1][2]],
+            mode='markers',
+            marker=dict(
+                size=5,
+                color='blue',
+                opacity=0.8
+            )
+        )
+        self.fig.add_trace(new_trace)
+        self.fig.update_layout()
 
-# 添加一个按钮，用于打开设置窗口
-settings_button = tk.Button(root, text="Settings", command=open_settings)
-settings_button.pack()
+    def update_point(self, index, new_point):
+        if index < 0 or index >= len(self.coords):
+            raise IndexError("Index out of range")
+        self.coords[index] = new_point
+        self.fig.data[index].x = [new_point[0]]
+        self.fig.data[index].y = [new_point[1]]
+        self.fig.data[index].z = [new_point[2]]
+        self.fig.update_layout()
 
-root.mainloop()
+app = dash.Dash(__name__)
+plotter = Scatter3DPlotter([[1, 2, 3], [4, 5, 6], [7, 8, 9]])
+
+app.layout = html.Div([
+    dcc.Graph(id='live-update-graph', figure=plotter.fig),
+    dcc.Input(id='x-input', type='number', value=0),
+    dcc.Input(id='y-input', type='number', value=0),
+    dcc.Input(id='z-input', type='number', value=0),
+    html.Button('Add Point', id='add-point-button', n_clicks=0),
+    dcc.Input(id='index-input', type='number', value=0),
+    html.Button('Update Point', id='update-point-button', n_clicks=0)
+])
+
+@app.callback(
+    Output('live-update-graph', 'figure'),
+    [Input('add-point-button', 'n_clicks')],
+    [State('x-input', 'value'),
+     State('y-input', 'value'),
+     State('z-input', 'value')]
+)
+def add_point(n_clicks, x, y, z):
+    if n_clicks > 0:
+        plotter.add_point([x, y, z])
+    return plotter.fig
+
+@app.callback(
+    Output('live-update-graph', 'figure'),
+    [Input('update-point-button', 'n_clicks')],
+    [State('index-input', 'value'),
+     State('x-input', 'value'),
+     State('y-input', 'value'),
+     State('z-input', 'value')]
+)
+def update_point(n_clicks, index, x, y, z):
+    if n_clicks > 0:
+        plotter.update_point(int(index), [x, y, z])
+    return plotter.fig
+
+if __name__ == '__main__':
+    app.run_server(debug=True)
