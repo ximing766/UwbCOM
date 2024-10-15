@@ -1,0 +1,8 @@
+tkinter
+ttkbootstrap
+serial
+pillow
+scikit-learn
+numpy
+matplotlib
+shapely
