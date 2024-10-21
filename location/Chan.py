@@ -1,4 +1,8 @@
+"""
 
+Chan的最小二乘解法,应用于3个以上锚点定位,锚点数为3时对部署位置要求高
+
+"""
 from math import *
 import numpy as np
 from numpy.linalg import *
@@ -40,8 +44,8 @@ class ChanALG:
         
         pos1 = np.sqrt(Za2) + self.X[0];
         pos2 = -np.sqrt(Za2) + self.X[0];
-        pos3 = [np.sqrt(Za2[0]), -np.sqrt(Za2[1])] + self.X[0]
-        pos4 = [-np.sqrt(Za2[0]), np.sqrt(Za2[1])] + self.X[0]
+        # pos3 = [np.sqrt(Za2[0]), -np.sqrt(Za2[1])] + self.X[0]
+        # pos4 = [-np.sqrt(Za2[0]), np.sqrt(Za2[1])] + self.X[0]
         pos = [pos1, pos2]#, pos3, pos4]
         return pos
 
@@ -66,13 +70,13 @@ def test():
     X1 = (dis, dis)
     X.append(X1)
     T = (dis*2, dis*2)  # 未知点，待求
-    n = 7   # 已知点的个数	
+    n = 3   # 已知点的个数	
     r1 = sqrt((X1[0] - T[0])**2 + (X1[1] - T[1])**2)  # X1与T的距离
-    X.append((dis + R * sqrt(3), dis))
-    X.append((dis - R * sqrt(3), dis))
-    X.append((dis + R * sqrt(3)/2, dis + R * 1.5))
+    # X.append((dis + R * sqrt(3), dis))
+    # X.append((dis - R * sqrt(3), dis))
+    # X.append((dis + R * sqrt(3)/2, dis + R * 1.5))
     X.append((dis - R * sqrt(3)/2, dis + R * 1.5))
-    X.append((dis - R * sqrt(3)/2, dis - R * 1.5))
+    # X.append((dis - R * sqrt(3)/2, dis - R * 1.5))
     X.append((dis + R * sqrt(3)/2, dis - R * 1.5))
     X = map(list, X) # 整体映射功能，将列表或元组转换为每个元素都为列表样式的列表
     X = np.array(list(X))
@@ -83,17 +87,19 @@ def test():
     for i in range(1, n): # 各已知点与未知点之间的距离，已知
         ri_1.append(sqrt((X[i][0] - T[0])**2 + (X[i][1] - T[1])**2) - r1 + Nerror[i-1])
     ri_1 = np.array(ri_1)
-    print("distance diff :",ri_1)
-    print("Anchor points :",X)
+
+    print("distance diff :\n",ri_1)
+    print("Anchor points :\n",X)
+
     ChanINS = ChanALG(ri_1, X, Q)
     pos = ChanINS.chan_location()  # 最终对比，从中选出一个正确的定位点
     drawPtTest(pos, T, X)
     
     # 打印结果
-    print(pos)
+    print("predict position:\n",pos)
+    
     for i in range(0, 2):
-        print (sqrt((pos[i][0] - T[0])**2 + (pos[i][1] - T[1])**2))
-
+        print ("RSME:\n",sqrt((pos[i][0] - T[0])**2 + (pos[i][1] - T[1])**2))
 
 if __name__ == "__main__":
     test()	

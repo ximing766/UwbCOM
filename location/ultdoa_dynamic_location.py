@@ -27,6 +27,10 @@ class CoordinatePlotter:
         self.ax.legend()
 
     def update_point(self, index, new_coord):
+        if not self.ax:
+            print("Axes object not found.")
+            return 
+        
         if 1 <= index <= len(self.scatters):
             # 更新坐标点
             self.scatters[index - 1].set_offsets([new_coord[0], new_coord[1]])
