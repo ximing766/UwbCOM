@@ -11,27 +11,37 @@ from PIL import Image, ImageTk
 import math
 import random
 import queue
+import json
 import os
+import configparser
 from sklearn.linear_model import LinearRegression
 from sklearn.preprocessing import PolynomialFeatures
 from sklearn.linear_model import ElasticNet
 import numpy as np
-from lift_uwb_dynamic_detect_plan import UWBLiftAnimationPlan1,UWBLiftAnimationPlan2
-from KF_classify import KalmanFilter
-from location.ultdoa_dynamic_location import CoordinatePlotter
-from location.Chan import ChanALG
+from Algorithm.lift_uwb_dynamic_detect_plan import UWBLiftAnimationPlan1,UWBLiftAnimationPlan2
+from Algorithm.KF_classify import KalmanFilter
+from Algorithm.location.ultdoa_dynamic_location import CoordinatePlotter
+from Algorithm.location.Chan_lse import ChanALG_LSE
+from Algorithm.location.Chan_equation import ChanEALG
 
 class SerialAssistant:
     def __init__(self, master):
         self.master = master
-        master.title("UwbCOM V1.0")
+
+        self.config = configparser.ConfigParser()
+        self.config.read('./config/init.ini')
+        print(self.config.get('DEFAULT', 'Version',fallback = 'unknow'))
+        self.version = self.config['DEFAULT']['Version']
+        self.Window = self.config['DEFAULT']['Window']
+
+        self.master.title(self.version)
         self.master.minsize(800, 800)
-        self.master.geometry("850x820")
+        self.master.geometry(self.Window)
         icon_path = os.path.join(os.path.dirname(__file__), 'UWB.ico')
         self.master.wm_iconbitmap(icon_path)
 
         # 设置串口参数
-        self.port         = "COM13"
+        self.port         = "COM1"
         self.baudrate     = 115200
         self.serial_open  = False
         self.serial_ports = []
@@ -110,6 +120,7 @@ class SerialAssistant:
     def create_widgets(self):
         '''
         description: 串口设置区域
+        
         '''        
         frame_settings = ttk.LabelFrame(self.master, text="串口设置",bootstyle="info")
         frame_settings.grid(row=0, column=0, padx=5, pady=5,sticky='nsew')
@@ -130,7 +141,7 @@ class SerialAssistant:
         ttk.Label(frame_settings, text="Baud" + Emoji._ITEMS[-106:][-4].char,bootstyle="danger").grid(row=1, column=0, padx=1, pady=5,sticky='w')
         self.baudrate_var = tk.IntVar()
         
-        self.baudCombo = ttk.Combobox(frame_settings,values=['115200','9600','3000000'],bootstyle="primary")
+        self.baudCombo = ttk.Combobox(frame_settings,values=['3000000','115200','9600'],bootstyle="primary")
         self.baudCombo.current(0)
         self.baudCombo.grid(row=1, column=1, padx=1, pady=5,sticky='we')
 
@@ -393,24 +404,14 @@ class SerialAssistant:
             self.flag_str = ""
         
         else:    #没有点击事件仍然收到了MOT则为红区，显示所有信息
-            cardNumber = int(data.split(':')[1].strip())
+            json_data = json.loads(data)
+            cardNumber = json_data['CardNumber']
             self.text_area1.delete(0, tk.END)
             self.text_area1.insert(tk.END, cardNumber)     #卡号
-            balance = int(data.split(':')[3].strip())
+            balance = json_data['Balance']
             self.text_area3.delete(0, tk.END)
             self.text_area3.insert(tk.END, str(balance / 100) + '￥')         #余额
-            # cardNumber = data[210:320][:20]
-            # self.text_area1.delete(0, tk.END)
-            # self.text_area1.insert(tk.END, cardNumber)     #卡号
-            # validPeriod = data[210:320][20:36]  
-            # self.text_area2.delete(0, tk.END)
-            # self.text_area2.insert(tk.END, validPeriod)     #有效期
-            # balance = int(data[210:320][48:52],16)
-            # self.text_area3.delete(0, tk.END)
-            # self.text_area3.insert(tk.END, str(balance / 100) + '￥')         #余额
-            # transactionRecord = data[210:320][92:106]
-            # self.text_area4.delete(0, tk.END)
-            # self.text_area4.insert(tk.END, transactionRecord)       #交易记录
+
         
     def change_filter(self,flag):
         self.Use_KF = flag
@@ -431,8 +432,8 @@ class SerialAssistant:
     
     #TWR方案数据处理函数
     def read_data(self):
-        self.UserInfo = "@DISTANCE"
-        self.CardInfoChar = "@CARDINFO";
+        self.PosInfo = "@POSITION"
+        self.CardInfo = "@CARDINFO";
         while self.serial and self.serial.is_open:
             try:
                 data = self.serial.readline()
@@ -440,26 +441,28 @@ class SerialAssistant:
                     data = data.decode('utf-8',errors='replace')
 
                     #卡片信息读取
-                    if self.CardInfoChar in data:
-                        # print(data)
+                    if self.CardInfo in data:
+                        print(data)
                         self.show_cardData(data)                                            
-                    if self.UserInfo in data:               
+                    if self.PosInfo in data:               
                         #获取用户下标，更新该用户的距离数据
-                        
-                        idx = int(data.split(':')[9].strip())   
+                        print(data)
+                        print(f"len:{len(data)}")
+                        json_data = json.loads(data)
+                        idx = json_data['idx']
                         if 0 <= idx < len(self.distance_list):
-                            self.distance_list[idx]['MasterDistance'] = int(data.split(':')[1].strip())
-                            self.distance_list[idx]['SlaverDistance'] = int(data.split(':')[3].strip())
-                            self.distance_list[idx]['GateDistance']   = int(data.split(':')[5].strip())
-                            self.distance_list[idx]['nLos']           = int(data.split(':')[7].strip())
-                            self.distance_list[idx]['lift_deep']      = int(data.split(':')[11].strip())
-                            if int(data.split(':')[13].strip()) != self.red_height or int(data.split(':')[15].strip()) != self.blue_height:
-                                self.red_height                           = int(data.split(':')[13].strip())
-                                self.blue_height                          = int(data.split(':')[15].strip())
-                                print(f"red_height: {self.red_height}  blue_height: {self.blue_height}")
-                                self.draw_basic();   
+                            self.distance_list[idx]['MasterDistance'] = json_data['Master']
+                            self.distance_list[idx]['SlaverDistance'] = json_data['Slave']
+                            self.distance_list[idx]['GateDistance']   = json_data['Gate']
+                            self.distance_list[idx]['nLos']           = json_data['nLos']
+                            self.distance_list[idx]['lift_deep']      = json_data['LiftDeep']
+                            if json_data['RedAreaH'] != self.red_height or json_data['BlueAreaH'] != self.blue_height:
+                                self.red_height                           = json_data['RedAreaH']
+                                self.blue_height                          = json_data['BlueAreaH']
+                                print(f"RedAreaH: {self.red_height}  BlueAreaH: {self.blue_height}")
+                                self.draw_basic()
                         else:
-                            print(f"Index {idx} is out of range.")
+                            print(f"Invalid index: {idx}")
                             continue
                         self.text_box.insert(tk.END, "用户 " + str(idx) + "  |  " + "nLos: " + str(self.distance_list[idx]['nLos'])  +  "  |  " +"主,从,门:  " \
                                              + str(self.distance_list[idx]['MasterDistance']) + " ," + str(self.distance_list[idx]['SlaverDistance']) +" ,"  \
@@ -670,7 +673,7 @@ class SerialAssistant:
         #         self.text_box.see(tk.END)
 
         #         self.DSi_M = self.cacl_timediff(data_master,data_slave1,data_slave2)       #计算时间差
-        #         ChanINS = ChanALG(self.DSi_M,self.Anchor_position,self.Q)
+        #         ChanINS = ChanALG_LSE(self.DSi_M,self.Anchor_position,self.Q)
         #         self.x,self.y = ChanINS.chan_location()
 
         #         self.draw_ULTDOA_Location(self.x,self.y)       #TODO 这儿应该是触发式更新图中坐标，而不是每次创建
