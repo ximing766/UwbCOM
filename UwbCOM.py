@@ -11,6 +11,7 @@ from PIL import Image, ImageTk
 import math
 import random
 import queue
+import time
 import json
 import os
 import configparser
@@ -55,6 +56,8 @@ class SerialAssistant:
             "SlaverDistance": 0,
             "CoorX_Arr"     : np.array([]),
             "CoorY_Arr"     : np.array([]),
+            "Start_X"       : None,
+            "Start_Y"       : None,
             "ZScoreFlag"    : 0,                       # Z-Score异常值处理标志, 记录未经过Z-Score处理过的新坐标数量
             "nLos"          : 0,                      
             "lift_deep"     : 0,
@@ -62,6 +65,7 @@ class SerialAssistant:
             "KF_predict"    : [0, 0],
         } for _ in range(20)]  
         #self.distance_list = [self.initial_dict.copy() for _ in range(20)]  #初始化20个用户的数据
+        self.user_oval = {}
 
         ## ** User Define ** ##
         #Emoji._ITEMS[i].name                               "🤨"
@@ -74,7 +78,7 @@ class SerialAssistant:
         self.lift_deep            = 0                       #电梯深度
         self.lift_height          = 0                       #电梯高度
         self.red_height           = 0
-        self.blue_height          = 150
+        self.blue_height          = 250
         
         self.queue_com1           = queue.Queue()           #存储不同COM的ULTDOA数据, 默认com1为主Anchor
         self.queue_com2           = queue.Queue()
@@ -90,6 +94,12 @@ class SerialAssistant:
         self.y                    = 0
         self.cor                  = []
         self.Use_KF               = False                    #使用卡尔曼滤波器还是弹性网络
+
+        self.CallCount = 0
+        self.current_time = 0
+        self.last_call_time = 0
+        self.max_moves = 12
+        self.move_times = 0
 
         #self.master.configure(background='pink')
         print(Emoji._ITEMS[-106:])
@@ -415,6 +425,10 @@ class SerialAssistant:
         
     def change_filter(self,flag):
         self.Use_KF = flag
+        if flag == True:
+            messagebox.showinfo("tips","filter has been changed to KalmanFilter" );
+        else:
+            messagebox.showinfo("tips","filter has been changed to ElasticNet" );
     
     #ULTDOA方案数据处理函数
     def UL_read_data(self,port,baudrate,queue):
@@ -435,19 +449,24 @@ class SerialAssistant:
         self.PosInfo = "@POSITION"
         self.CardInfo = "@CARDINFO";
         while self.serial and self.serial.is_open:
-            try:
-                data = self.serial.readline()
-                if data:
-                    data = data.decode('utf-8',errors='replace')
 
-                    #卡片信息读取
+            self.current_time = time.time()
+            if self.last_call_time is None:
+                self.last_call_time = self.current_time
+            elif self.current_time - self.last_call_time >= 1:
+                print(f"@ Location has been updated {self.CallCount} times in the last second.")
+                self.CallCount = 0 
+                self.last_call_time = self.current_time
+
+            try:
+                if (data := self.serial.readline()):
+                    data = data.decode('utf-8',errors='replace')
                     if self.CardInfo in data:
-                        print(data)
+                        # print(data)
                         self.show_cardData(data)                                            
                     if self.PosInfo in data:               
-                        #获取用户下标，更新该用户的距离数据
-                        print(data)
-                        print(f"len:{len(data)}")
+                        # print(data)
+                        # print(f"len:{len(data)}")
                         json_data = json.loads(data)
                         idx = json_data['idx']
                         if 0 <= idx < len(self.distance_list):
@@ -492,7 +511,7 @@ class SerialAssistant:
                                 user_kf.predict()
                                 prediction = user_kf.update(z)
                                 prediction = prediction.T.tolist()[0]
-                                print("user %d prediction =:" % idx, prediction)
+                                print(f"KF_Filter : user {idx} prediction = {int(prediction[0]-400),int(prediction[1]-60)}")
                                 self.distance_list[idx]["KF_predict"] = prediction
                                 self.draw_user_KF(self.distance_list[idx]["KF_predict"],idx)  
                             else:
@@ -502,8 +521,6 @@ class SerialAssistant:
                                 self.distance_list[idx]['CoorY_Arr']   = np.append(self.distance_list[idx]['CoorY_Arr'],self.y)
                                 
                                 if len(self.distance_list[idx]['CoorX_Arr']) == 20:                                                                
-                                    
-                                    #start_time = time.perf_counter()
                                     #异常值去除:Z-Score  ：每20轮调用一次，一次处理20组coornidate。保证所有数据都能被处理的同时，最大程度消减新coornidate移动带来的偏差。
                                     if self.distance_list[idx]['ZScoreFlag'] == len(self.distance_list[idx]['CoorX_Arr']):
                                         self.distance_list[idx]['CoorX_Arr'] ,self.distance_list[idx]['CoorY_Arr'] = self.Z_Score(self.distance_list[idx]['CoorX_Arr'],self.distance_list[idx]['CoorY_Arr'])
@@ -512,26 +529,23 @@ class SerialAssistant:
                                     if len(self.distance_list[idx]['CoorX_Arr']) < 20:
                                         print('Z-Socre reduce some data,return.',len(self.distance_list[idx]['CoorX_Arr']))
                                     else:
-                                        #滤波:Moving-Average
+                                        self.CallCount += 1
+                                        #滤波:Moving-Average   19
                                         self.distance_list[idx]['CoorX_Arr'] = self.moving_average(self.distance_list[idx]['CoorX_Arr'],2).astype(int)
                                         self.distance_list[idx]['CoorY_Arr'] = self.moving_average(self.distance_list[idx]['CoorY_Arr'],2).astype(int)
-                                        
+
                                         #创建回归曲线模型，预测用户坐标位置
                                         self.predict_x,self.predict_y = self.predict_coor(self.distance_list[idx]['CoorX_Arr'],self.distance_list[idx]['CoorY_Arr'])
                                         
-                                        #添加预测数据到数组末尾
+                                        #添加预测数据到数组末尾  20
                                         self.distance_list[idx]['CoorX_Arr'] = np.append(self.distance_list[idx]['CoorX_Arr'],self.predict_x)    
                                         self.distance_list[idx]['CoorY_Arr'] = np.append(self.distance_list[idx]['CoorY_Arr'],self.predict_y)
-                                        
+                                        # print("draw user!!!")
                                         self.draw_user_EN(self.distance_list,idx)  
 
                                         #删除一部分，添加新的运动趋势
                                         self.distance_list[idx]['CoorX_Arr'] = np.delete(self.distance_list[idx]['CoorX_Arr'],[0])           
                                         self.distance_list[idx]['CoorY_Arr'] = np.delete(self.distance_list[idx]['CoorY_Arr'],[0])
-                                                                                                                    
-                                        #end_time = time.perf_counter()
-                                        #run_time = end_time - start_time
-                                        #print(f"绘制时间(不含搜集数据): {run_time} 秒")
                                 else:
                                     pass
                         else:
@@ -544,16 +558,32 @@ class SerialAssistant:
     def check_nLos(self):
         for idx, item in enumerate(self.distance_list):
             if item.get('nLos') == 1:
-                print(f"Found nLos == 1 at index {idx}")
+                # print(f"Found nLos == 1 at index {idx}")
                 return True
         return False
+    
+    def move_oval(self,canvas, oval, start_x, start_y, end_x, end_y, step=1):
+    # 计算x和y的移动增量
+        x_move = (end_x - start_x) / 6
+        y_move = (end_y - start_y) / 6
+
+        # 移动椭圆
+        canvas.move(oval, x_move, y_move)
+        self.move_times += 1
+        # print(f'moveing...{self.move_times}')
+        # 如果计数器小于最大移动次数，并且椭圆还没有到达终点，则继续移动
+        if self.move_times < self.max_moves and abs(start_x + x_move - end_x) > 0.1 and abs(start_y + y_move - end_y) > 0.1:
+            canvas.after(10, self.move_oval, canvas, oval, start_x + x_move, start_y + y_move, end_x, end_y, step)
+        else:
+            self.move_times = 0
+            # 如果达到最大移动次数或椭圆已经到达终点，调整到精确位置
+            canvas.coords(oval, end_x - 5, end_y - 5, end_x + 5, end_y + 5)
+            # print("Move Over")
 
     def draw_user_EN(self,user,idx):
-        colors = ['purple',  'teal','magenta', 'green', 'blue', 'yellow', 'orange', 'purple', 'pink', 'brown', 'gray', 'cyan', 'red', 'navy', 'maroon', \
-                  'olive', 'lime', 'aqua', 'indigo' ,'plum']
+        colors = ['purple',  'teal','magenta', 'green', 'blue', 'yellow', 'orange', 'purple', 'pink', 'brown', 'gray', 'cyan', 'red', 'navy', 'maroon', 'olive', 'lime', 'aqua', 'indigo' ,'plum']
         tags   = "user" + str(idx)
-        self.canvas.delete(tags)
-
+        # self.canvas.delete(tags)
         #用户被遮挡，绘制扩展区域
         selected_mode = self.modeCombo.get()
         if  selected_mode == "GATE":
@@ -565,38 +595,58 @@ class SerialAssistant:
                         
                         self.canvas.create_arc(400-self.Master2SlverDistance/2, 60-self.Master2SlverDistance/2, 400+self.Master2SlverDistance/2,  \
                                             60+self.Master2SlverDistance/2, start=180, extent=180, fill='#FF6347',outline="#FF6347")
+                        if self.canvas.find_withtag(tags):
+                            self.canvas.delete(tags)
+                            self.user_oval[f'user_{idx}_oval'] = self.canvas.create_oval(user[idx]['Start_X']-5, user[idx]['Start_X']-5, user[idx]['Start_X']+5,  
+                                                                         user[idx]['Start_X']+5, outline=colors[idx], fill=colors[idx],tags=("user" + str(idx)))
                     else:
                         self.canvas.create_arc(400-self.Master2SlverDistance/2 - 7.5, 60-self.red_height/2 -7.5, 400+self.Master2SlverDistance/2 + 7.5, \
                                             60+self.red_height/2 +7.5, start=180, extent=180, fill='plum',outline="plum",tags="nLos") #FFA54F
                         
                         self.canvas.create_arc(400-self.Master2SlverDistance/2, 60-self.red_height/2, 400+self.Master2SlverDistance/2,  \
                                             60+self.red_height/2, start=180, extent=180, fill='#FF6347',outline="#FF6347")
+                        
+                        if self.canvas.find_withtag(tags):
+                            self.canvas.delete(tags)
+                            self.user_oval[f'user_{idx}_oval'] = self.canvas.create_oval(user[idx]['Start_X']-5, user[idx]['Start_X']-5, user[idx]['Start_X']+5,  
+                                                                         user[idx]['Start_X']+5, outline=colors[idx], fill=colors[idx],tags=("user" + str(idx)))
+                        
             elif self.canvas.find_withtag("nLos"):
                 self.canvas.delete("nLos")
-
-        if len(user[idx]['CoorX_Arr']) > 0: 
-                self.canvas.create_oval(user[idx]['CoorX_Arr'][-1]-5, user[idx]['CoorY_Arr'][-1]-5, user[idx]['CoorX_Arr'][-1]+5, user[idx]['CoorY_Arr'][-1]+5,  \
-                                        outline=colors[idx], fill=colors[idx],tags=("user" + str(idx)))
+        #首次创建User
+        if not self.canvas.find_withtag(tags): 
+            print(f'Create user_{idx}')
+            self.user_oval[f'user_{idx}_oval'] = self.canvas.create_oval(user[idx]['CoorX_Arr'][-1]-5, user[idx]['CoorY_Arr'][-1]-5, user[idx]['CoorX_Arr'][-1]+5,  
+                                                                         user[idx]['CoorY_Arr'][-1]+5, outline=colors[idx], fill=colors[idx],tags=("user" + str(idx)))
+        else:
+            self.move_oval(self.canvas,self.user_oval[f'user_{idx}_oval'],user[idx]['Start_X'],user[idx]['Start_Y'],user[idx]['CoorX_Arr'][-1],user[idx]['CoorY_Arr'][-1])
+            # print(f'Begin X: {user[idx]["Start_X"]}, Begin Y: {user[idx]["Start_Y"]}, End X: {user[idx]["CoorX_Arr"][-1]}, End Y: {user[idx]["CoorY_Arr"][-1]}')
+        user[idx]['Start_X'] = user[idx]['CoorX_Arr'][-1]
+        user[idx]['Start_Y'] = user[idx]['CoorY_Arr'][-1]
     
     def draw_user_KF(self,user,idx):
         colors = ['olive', 'lime', 'aqua', 'indigo' ,'plum','purple',  'teal','magenta', 'green', 'blue', 'yellow', 'orange', 'pink', 'brown', 'gray', 'cyan', 'red', 'navy', 'maroon']
         tags   = "user" + str(idx)
-        self.canvas.delete(tags)
+        # self.canvas.delete(tags)
 
-        #用户被遮挡，绘制扩展区域
-        selected_mode = self.modeCombo.get()
-        if  selected_mode == "GATE":
-            if self.check_nLos() == True:  #只要有一个用户被遮挡，就绘制扩展区域
-                if not self.canvas.find_withtag("nLos"): #防止重复绘制
-                    self.canvas.create_arc(400-self.Master2SlverDistance/2 - 12.5, 60-self.Master2SlverDistance/2 -12.5, 400+self.Master2SlverDistance/2 + 12.5, \
-                                        60+self.Master2SlverDistance/2 +12.5, start=180, extent=180, fill='plum',outline="plum",tags="nLos") #FFA54F
-                    self.canvas.create_arc(400-self.Master2SlverDistance/2, 60-self.Master2SlverDistance/2, 400+self.Master2SlverDistance/2,  \
-                                        60+self.Master2SlverDistance/2, start=180, extent=180, fill='#FF6347',outline="#FF6347")
-            elif self.canvas.find_withtag("nLos"):
-                self.canvas.delete("nLos")
+        # #用户被遮挡，绘制扩展区域
+        # selected_mode = self.modeCombo.get()
+        # if  selected_mode == "GATE":
+        #     if self.check_nLos() == True:  #只要有一个用户被遮挡，就绘制扩展区域
+        #         if not self.canvas.find_withtag("nLos"): #防止重复绘制
+        #             self.canvas.create_arc(400-self.Master2SlverDistance/2 - 12.5, 60-self.Master2SlverDistance/2 -12.5, 400+self.Master2SlverDistance/2 + 12.5, \
+        #                                 60+self.Master2SlverDistance/2 +12.5, start=180, extent=180, fill='plum',outline="plum",tags="nLos") #FFA54F
+        #             self.canvas.create_arc(400-self.Master2SlverDistance/2, 60-self.Master2SlverDistance/2, 400+self.Master2SlverDistance/2,  \
+        #                                 60+self.Master2SlverDistance/2, start=180, extent=180, fill='#FF6347',outline="#FF6347")
+        #     elif self.canvas.find_withtag("nLos"):
+        #         self.canvas.delete("nLos")
 
-            self.canvas.create_oval(user[0]-5, user[1]-5, user[0]+5, user[1]+5,  \
-                                    outline=colors[idx], fill=colors[idx],tags=("user" + str(idx)))
+        if not self.canvas.find_withtag(tags): 
+            self.user_oval[f'user_{idx}_oval'] = self.canvas.create_oval(user[0]-5, user[1]-5, user[0]+5, user[1]+5,outline=colors[idx], fill=colors[idx],tags=("user" + str(idx)))
+        else:
+            self.move_oval(self.canvas,self.user_oval[f'user_{idx}_oval'],self.distance_list[idx]['Start_X'],self.distance_list[idx]['Start_Y'],user[0],user[1])
+        self.distance_list[idx]['Start_X'] = int(user[0])
+        self.distance_list[idx]['Start_Y'] = int(user[1])
     
     def draw_basic(self):
         self.canvas.delete("all")
@@ -658,7 +708,8 @@ class SerialAssistant:
             
         elif selected_mode == "DL-TDOA":
             messagebox.showinfo("Tips", "功能待开发")
-            pass    
+            pass
+        
         else:
             self.draw_basic();      
 
@@ -859,8 +910,8 @@ def main():
     #滤波算法选择菜单
     filter_menu = tk.Menu(menubar, tearoff=0)
     menubar.add_cascade(label="滤波", menu=filter_menu)
-    kalman_filter_menu = filter_menu.add_command(label="Kalman-Filter", command=app.change_filter(True))
-    elasticnet_filter_menu = filter_menu.add_command(label="ElasticNet", command=app.change_filter(False))
+    kalman_filter_menu = filter_menu.add_command(label="Kalman-Filter", command=lambda:app.change_filter(True))
+    elasticnet_filter_menu = filter_menu.add_command(label="ElasticNet", command=lambda:app.change_filter(False))
     
 
     root.mainloop()
