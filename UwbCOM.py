@@ -12,6 +12,7 @@ import math
 import random
 import queue
 import time
+import warnings
 import json
 import os
 import configparser
@@ -73,7 +74,7 @@ class SerialAssistant:
         self.face = Emoji.get("winking face")
         self.init_draw            = 0                       #限制除用户外，其它图形多次作图
         self.flag_str             = ""                      #判断需要获取的卡信息种类
-        self.Master2SlverDistance = 0;                      #画图用的闸间距
+        self.Master2SlverDistance = 0                       #画图用的闸间距
         self.radius               = 0                       #UWB初始扫描半径
         self.lift_deep            = 0                       #电梯深度
         self.lift_height          = 0                       #电梯高度
@@ -95,11 +96,13 @@ class SerialAssistant:
         self.cor                  = []
         self.Use_KF               = False                    #使用卡尔曼滤波器还是弹性网络
 
-        self.CallCount = 0
-        self.current_time = 0
-        self.last_call_time = 0
-        self.max_moves = 12
-        self.move_times = 0
+        self.CallCount            = 0
+        self.current_time         = 0
+        self.last_call_time       = 0
+        self.max_moves            = 10
+        self.move_times           = 0
+        self.x_move               = 0
+        self.y_move               = 0
 
         #self.master.configure(background='pink')
         print(Emoji._ITEMS[-106:])
@@ -466,8 +469,10 @@ class SerialAssistant:
                         self.show_cardData(data)                                            
                     if self.PosInfo in data:               
                         # print(data)
-                        # print(f"len:{len(data)}")
-                        json_data = json.loads(data)
+                        try:
+                            json_data = json.loads(data)
+                        except json.JSONDecodeError as e:
+                            print("解析错误：", e)
                         idx = json_data['idx']
                         if 0 <= idx < len(self.distance_list):
                             self.distance_list[idx]['MasterDistance'] = json_data['Master']
@@ -549,7 +554,7 @@ class SerialAssistant:
                                 else:
                                     pass
                         else:
-                            print("距离数据有误,计算出Y为负数")
+                            print("E : Y is calculated negative!!!")
             except serial.SerialException:
                 self.text_box.insert(tk.END, "串口连接已断开\n")
                 break
@@ -562,23 +567,23 @@ class SerialAssistant:
                 return True
         return False
     
-    def move_oval(self,canvas, oval, start_x, start_y, end_x, end_y, step=1):
-    # 计算x和y的移动增量
-        x_move = (end_x - start_x) / 6
-        y_move = (end_y - start_y) / 6
-
-        # 移动椭圆
-        canvas.move(oval, x_move, y_move)
+    '''
+    description: 
+    param {*} uniform_speed  1:匀速运动  2:减速运动 待开发 3:加速运动 待开发
+    '''    
+    def move_oval(self,canvas, oval, start_x, start_y, end_x, end_y, uniform_speed=1):
+        if uniform_speed == 1:
+            self.x_move = (end_x - start_x) / 10
+            self.y_move = (end_y - start_y) / 10
+        
+        canvas.move(oval, self.x_move, self.y_move)
         self.move_times += 1
-        # print(f'moveing...{self.move_times}')
-        # 如果计数器小于最大移动次数，并且椭圆还没有到达终点，则继续移动
-        if self.move_times < self.max_moves and abs(start_x + x_move - end_x) > 0.1 and abs(start_y + y_move - end_y) > 0.1:
-            canvas.after(10, self.move_oval, canvas, oval, start_x + x_move, start_y + y_move, end_x, end_y, step)
+        print(f"X_move = {self.x_move} Y_move = {self.y_move} moveing...{self.move_times}")
+        if self.move_times < self.max_moves and abs(start_x + self.x_move - end_x) > 0.1 and abs(start_y + self.y_move - end_y) > 0.1:
+            canvas.after(10, self.move_oval, canvas, oval, start_x + self.x_move, start_y + self.y_move, end_x, end_y, 0)
         else:
             self.move_times = 0
-            # 如果达到最大移动次数或椭圆已经到达终点，调整到精确位置
             canvas.coords(oval, end_x - 5, end_y - 5, end_x + 5, end_y + 5)
-            # print("Move Over")
 
     def draw_user_EN(self,user,idx):
         colors = ['purple',  'teal','magenta', 'green', 'blue', 'yellow', 'orange', 'purple', 'pink', 'brown', 'gray', 'cyan', 'red', 'navy', 'maroon', 'olive', 'lime', 'aqua', 'indigo' ,'plum']
@@ -608,8 +613,8 @@ class SerialAssistant:
                         
                         if self.canvas.find_withtag(tags):
                             self.canvas.delete(tags)
-                            self.user_oval[f'user_{idx}_oval'] = self.canvas.create_oval(user[idx]['Start_X']-5, user[idx]['Start_X']-5, user[idx]['Start_X']+5,  
-                                                                         user[idx]['Start_X']+5, outline=colors[idx], fill=colors[idx],tags=("user" + str(idx)))
+                            self.user_oval[f'user_{idx}_oval'] = self.canvas.create_oval(user[idx]['Start_X']-5, user[idx]['Start_Y']-5, user[idx]['Start_X']+5,  
+                                                                         user[idx]['Start_Y']+5, outline=colors[idx], fill=colors[idx],tags=("user" + str(idx)))
                         
             elif self.canvas.find_withtag("nLos"):
                 self.canvas.delete("nLos")
@@ -917,4 +922,5 @@ def main():
     root.mainloop()
 
 if __name__ == "__main__":
+    warnings.filterwarnings("ignore")
     main()
