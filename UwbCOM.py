@@ -30,15 +30,15 @@ class SerialAssistant:
     def __init__(self, master):
         self.master = master
 
-        self.config = configparser.ConfigParser()
-        self.config.read('./config/init.ini')
-        print(self.config.get('DEFAULT', 'Version',fallback = 'unknow'))
-        self.version = self.config['DEFAULT']['Version']
-        self.Window = self.config['DEFAULT']['Window']
+        # self.config = configparser.ConfigParser()
+        # self.config.read('./config/init.ini')
+        # print(self.config.get('DEFAULT', 'Version',fallback = 'unknow'))
+        # self.version = self.config['DEFAULT']['Version']
+        # self.Window = self.config['DEFAULT']['Window']
 
-        self.master.title(self.version)
+        self.master.title("UwbCOM V1.1")
         self.master.minsize(800, 800)
-        self.master.geometry(self.Window)
+        self.master.geometry("850x820")
         icon_path = os.path.join(os.path.dirname(__file__), 'UWB.ico')
         self.master.wm_iconbitmap(icon_path)
 
@@ -57,8 +57,8 @@ class SerialAssistant:
             "SlaverDistance": 0,
             "CoorX_Arr"     : np.array([]),
             "CoorY_Arr"     : np.array([]),
-            "Start_X"       : None,
-            "Start_Y"       : None,
+            "Start_X"       : 0,
+            "Start_Y"       : 0,
             "ZScoreFlag"    : 0,                       # Z-Score异常值处理标志, 记录未经过Z-Score处理过的新坐标数量
             "nLos"          : 0,                      
             "lift_deep"     : 0,
@@ -371,18 +371,24 @@ class SerialAssistant:
             self.text_area4.delete(0,tk.END)
         elif flag == 3:
             content = self.text_box.get("1.0",tk.END)
-            print(content)
-            filename = "Distance_content.txt";
-            with open(filename,"w" ,encoding="utf-8") as file:
-                file.write(content)
-            messagebox.showinfo("tips","save file to root dir success!");
-            
+            # print(content)
+            filename = "E:/Distance_content.txt"
+            try:
+                with open(filename,"w" ,encoding="utf-8") as file:
+                    file.write(content)
+                messagebox.showinfo("tips","save file to root dir success!")
+            except Exception as e:
+                messagebox.showerror("tips","save file to root dir failed!")
+                
         elif flag == 4:
             content  = self.text_box2.get(1.0,tk.END)
-            filename = "Corr_content.csv"
-            with open(filename,"w") as file:
-                file.write(content)
-            messagebox.showinfo("tips","save file to root dir success!");
+            filename = "E:/Corr_content.csv"
+            try:
+                with open(filename,"w",encoding="utf-8") as file:
+                    file.write(content)
+                messagebox.showinfo("tips","save file to root dir success!")
+            except Exception as e:
+                messagebox.showerror("tips","save file to root dir failed!")
     
     def send_data(self,flag):
         self.flag_str = str(flag)
@@ -488,7 +494,7 @@ class SerialAssistant:
                         else:
                             print(f"Invalid index: {idx}")
                             continue
-                        self.text_box.insert(tk.END, "用户 " + str(idx) + "  |  " + "nLos: " + str(self.distance_list[idx]['nLos'])  +  "  |  " +"主,从,门:  " \
+                        self.text_box.insert(tk.END, "用户 " + str(idx) + "  |  " + "nLos: " + str(self.distance_list[idx]['nLos'])  +  "  |  " +"主,从,门,  " \
                                              + str(self.distance_list[idx]['MasterDistance']) + " ," + str(self.distance_list[idx]['SlaverDistance']) +" ,"  \
                                                 + str(self.distance_list[idx]['GateDistance']) + " <cm>" + "\n")
                         self.text_box.see(tk.END)
@@ -505,7 +511,7 @@ class SerialAssistant:
                                 self.y = math.sqrt(abs(self.y**2 - 35*35))  
 
                             self.y = self.y + 60 
-                            self.text_box2.insert(tk.END,f"<user,x,y> {idx} , {self.x-400:.0f} , {self.y-60:.0f}\n")
+                            self.text_box2.insert(tk.END,f"<user,x,y>, {idx} , {self.x-400:.0f} , {self.y-60:.0f}\n")
                             self.text_box2.see(tk.END)
                             
                             if self.Use_KF == True:
@@ -545,8 +551,10 @@ class SerialAssistant:
                                         #添加预测数据到数组末尾  20
                                         self.distance_list[idx]['CoorX_Arr'] = np.append(self.distance_list[idx]['CoorX_Arr'],self.predict_x)    
                                         self.distance_list[idx]['CoorY_Arr'] = np.append(self.distance_list[idx]['CoorY_Arr'],self.predict_y)
-                                        # print("draw user!!!")
-                                        self.draw_user_EN(self.distance_list,idx)  
+
+                                        if  abs(self.distance_list[idx]['Start_X'] - self.distance_list[idx]['CoorX_Arr'][-1]) > 2 and abs(self.distance_list[idx]['Start_Y'] - self.distance_list[idx]['CoorY_Arr'][-1]) > 2:
+                                            print("draw user!!!")
+                                            self.draw_user_EN(self.distance_list,idx)  
 
                                         #删除一部分，添加新的运动趋势
                                         self.distance_list[idx]['CoorX_Arr'] = np.delete(self.distance_list[idx]['CoorX_Arr'],[0])           
@@ -579,7 +587,7 @@ class SerialAssistant:
         canvas.move(oval, self.x_move, self.y_move)
         self.move_times += 1
         print(f"X_move = {self.x_move} Y_move = {self.y_move} moveing...{self.move_times}")
-        if self.move_times < self.max_moves and abs(start_x + self.x_move - end_x) > 0.1 and abs(start_y + self.y_move - end_y) > 0.1:
+        if self.move_times < self.max_moves and abs(start_x + self.x_move - end_x) > 1 and abs(start_y + self.y_move - end_y) > 1:
             canvas.after(10, self.move_oval, canvas, oval, start_x + self.x_move, start_y + self.y_move, end_x, end_y, 0)
         else:
             self.move_times = 0
@@ -780,7 +788,7 @@ class SerialAssistant:
     def open_coordinate_settings(self):
         settings_window = tk.Toplevel()  # 创建新的Toplevel窗口
         settings_window.title("Settings")
-        settings_window.geometry("500x200")  # 设置窗口大小
+        settings_window.geometry("500x150")  # 设置窗口大小
 
         # 在设置窗口中添加一些设置选项
         ttk.Label(settings_window, text="Master_X:"+ Emoji._ITEMS[-106:][7].char,bootstyle = "danger").grid(row=0, column=0)
