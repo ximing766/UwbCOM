@@ -39,7 +39,7 @@ class SerialAssistant:
         self.master.title("UwbCOM V1.1")
         self.master.minsize(800, 800)
         self.master.geometry("850x820")
-        icon_path = os.path.join(os.path.dirname(__file__), 'UWB.ico')
+        icon_path = os.path.join(os.path.dirname(__file__), 'UWBCOM.ico')
         self.master.wm_iconbitmap(icon_path)
 
         # 设置串口参数
@@ -74,27 +74,27 @@ class SerialAssistant:
         self.face = Emoji.get("winking face")
         self.init_draw            = 0                       #限制除用户外，其它图形多次作图
         self.flag_str             = ""                      #判断需要获取的卡信息种类
-        self.Master2SlverDistance = 0                       #画图用的闸间距
-        self.radius               = 0                       #UWB初始扫描半径
-        self.lift_deep            = 0                       #电梯深度
-        self.lift_height          = 0                       #电梯高度
+        self.Master2SlverDistance = 0                       
+        self.radius               = 0                      
+        self.lift_deep            = 0                       
+        self.lift_height          = 0                       
         self.red_height           = 0
         self.blue_height          = 250
         
-        self.queue_com1           = queue.Queue()           #存储不同COM的ULTDOA数据, 默认com1为主Anchor
+        self.queue_com1           = queue.Queue()           
         self.queue_com2           = queue.Queue()
         self.queue_com3           = queue.Queue()
-        self.DSi_M                = []                      #Slver_i到Master的距离
-        self.Q                    = []                      #Q值
+        self.DSi_M                = []                     
+        self.Q                    = []                      
         self.Anchor_position      = []                      #所有点坐标
-        self.master_position      = []                      #主Anchor坐标
-        self.slave1_position      = []                      #从Anchor坐标
+        self.master_position      = []                      
+        self.slave1_position      = []                     
         self.slave2_position      = []
 
         self.x                    = 0
         self.y                    = 0
         self.cor                  = []
-        self.Use_KF               = False                    #使用卡尔曼滤波器还是弹性网络
+        self.Use_KF               = False                    
 
         self.CallCount            = 0
         self.current_time         = 0
@@ -104,10 +104,8 @@ class SerialAssistant:
         self.x_move               = 0
         self.y_move               = 0
 
-        #self.master.configure(background='pink')
         print(Emoji._ITEMS[-106:])
 
-        # 创建界面
         self.create_widgets()
 
         #实时更新串口选择框
@@ -128,7 +126,7 @@ class SerialAssistant:
     
     def update_combobox_periodically(self):
         self.update_combobox()
-        self.master.after(1000, self.update_combobox_periodically)  # 每隔1秒调用一次
+        self.master.after(1000, self.update_combobox_periodically)  
 
     def create_widgets(self):
         '''
@@ -301,7 +299,6 @@ class SerialAssistant:
         def update_progressbar3_value(event):
             value = f"UWB_R : {progressbar3.get():.1f}"
             self.progressbar3_value.set(value)
-            # 赋值给self.radius
             self.radius = float(value.split(":")[1].strip())
 
         progressbar3.bind("<Motion>", update_progressbar3_value)
@@ -356,8 +353,8 @@ class SerialAssistant:
             self.serial.close()
             self.text_box.insert(tk.END, "串口已关闭\n")
 
-            self.canvas.delete("all")       #清空画布
-            self.Master2SlverDistance = 0   #初始化闸间距, 防止下次打开串口时，画图出错
+            self.canvas.delete("all")       
+            self.Master2SlverDistance = 0   
             self.serial_open          = False
             self.update_serial_button()
                                                  
@@ -401,35 +398,35 @@ class SerialAssistant:
             cardNumber = data[210:320][:20]
             #self.text_area1.delete(tk.END)
             self.text_area1.delete(0, tk.END)
-            self.text_area1.insert(tk.END, cardNumber)     #卡号
+            self.text_area1.insert(tk.END, cardNumber)     
             self.flag_str = ""
             
         elif self.flag_str == "22222":
             validPeriod = data[210:320][20:36]
             self.text_area2.delete('1.0', tk.END)
-            self.text_area2.insert(tk.END, validPeriod)     #有效期
+            self.text_area2.insert(tk.END, validPeriod)     
             self.flag_str = ""
             
         elif self.flag_str == "33333":
             balance = int(data[210:320][48:52],16)
             self.text_area3.delete('1.0', tk.END)
-            self.text_area3.insert(tk.END, str(balance / 100))         #余额
+            self.text_area3.insert(tk.END, str(balance / 100))         
             self.flag_str = ""
             
         elif self.flag_str == "44444":
             transactionRecord = data[210:320][92:106]
             self.text_area4.delete('1.0', tk.END)
-            self.text_area4.insert(tk.END, transactionRecord)       #交易记录
+            self.text_area4.insert(tk.END, transactionRecord)       
             self.flag_str = ""
         
-        else:    #没有点击事件仍然收到了MOT则为红区，显示所有信息
+        else:   
             json_data = json.loads(data)
             cardNumber = json_data['CardNumber']
             self.text_area1.delete(0, tk.END)
-            self.text_area1.insert(tk.END, cardNumber)     #卡号
+            self.text_area1.insert(tk.END, cardNumber)    
             balance = json_data['Balance']
             self.text_area3.delete(0, tk.END)
-            self.text_area3.insert(tk.END, str(balance / 100) + '￥')         #余额
+            self.text_area3.insert(tk.END, str(balance / 100) + '￥')        
 
         
     def change_filter(self,flag):
@@ -439,21 +436,18 @@ class SerialAssistant:
         else:
             messagebox.showinfo("tips","filter has been changed to ElasticNet" );
     
-    #ULTDOA方案数据处理函数
     def UL_read_data(self,port,baudrate,queue):
         ser = serial.Serial(port, baudrate, timeout=1)
         while True:
             try:
                 if ser.in_waiting > 0:
                     data = ser.readline().decode('utf-8').strip()
-                    # 将数据添加到队列中，以便在主线程中更新UI
                     queue.put(data)
             except serial.SerialException as e:
                 print(f"Error reading from {port}: {e}")
                 break
         pass
     
-    #TWR方案数据处理函数
     def read_data(self):
         self.PosInfo = "@POSITION"
         self.CardInfo = "@CARDINFO";
@@ -515,7 +509,6 @@ class SerialAssistant:
                             self.text_box2.see(tk.END)
                             
                             if self.Use_KF == True:
-                                #卡尔曼滤波方案
                                 self.cor = [self.x,self.y]
                                 user_kf  = self.distance_list[idx]['KF']
                                 z        = np.matrix(self.cor).T
@@ -526,7 +519,6 @@ class SerialAssistant:
                                 self.distance_list[idx]["KF_predict"] = prediction
                                 self.draw_user_KF(self.distance_list[idx]["KF_predict"],idx)  
                             else:
-                                #弹性网络方案
                                 self.distance_list[idx]['ZScoreFlag'] += 1
                                 self.distance_list[idx]['CoorX_Arr']   = np.append(self.distance_list[idx]['CoorX_Arr'],self.x)
                                 self.distance_list[idx]['CoorY_Arr']   = np.append(self.distance_list[idx]['CoorY_Arr'],self.y)
@@ -541,14 +533,13 @@ class SerialAssistant:
                                         print('Z-Socre reduce some data,return.',len(self.distance_list[idx]['CoorX_Arr']))
                                     else:
                                         self.CallCount += 1
-                                        #滤波:Moving-Average   19
+                                        #19
                                         self.distance_list[idx]['CoorX_Arr'] = self.moving_average(self.distance_list[idx]['CoorX_Arr'],2).astype(int)
                                         self.distance_list[idx]['CoorY_Arr'] = self.moving_average(self.distance_list[idx]['CoorY_Arr'],2).astype(int)
 
-                                        #创建回归曲线模型，预测用户坐标位置
                                         self.predict_x,self.predict_y = self.predict_coor(self.distance_list[idx]['CoorX_Arr'],self.distance_list[idx]['CoorY_Arr'])
                                         
-                                        #添加预测数据到数组末尾  20
+                                        #20
                                         self.distance_list[idx]['CoorX_Arr'] = np.append(self.distance_list[idx]['CoorX_Arr'],self.predict_x)    
                                         self.distance_list[idx]['CoorY_Arr'] = np.append(self.distance_list[idx]['CoorY_Arr'],self.predict_y)
 
@@ -556,7 +547,6 @@ class SerialAssistant:
                                             print("draw user!!!")
                                             self.draw_user_EN(self.distance_list,idx)  
 
-                                        #删除一部分，添加新的运动趋势
                                         self.distance_list[idx]['CoorX_Arr'] = np.delete(self.distance_list[idx]['CoorX_Arr'],[0])           
                                         self.distance_list[idx]['CoorY_Arr'] = np.delete(self.distance_list[idx]['CoorY_Arr'],[0])
                                 else:
@@ -567,7 +557,6 @@ class SerialAssistant:
                 self.text_box.insert(tk.END, "串口连接已断开\n")
                 break
 
-            #time.sleep(0.05)
     def check_nLos(self):
         for idx, item in enumerate(self.distance_list):
             if item.get('nLos') == 1:
@@ -775,7 +764,7 @@ class SerialAssistant:
         S1_common_base_timestamp    = Slave1_blink_rx - Ref_SA1
         S2_common_base_timestamp    = Slave2_blink_rx - Ref_SA2
 
-        TDOA_MA_S1 = MA_S1_common_base_timestamp - S1_common_base_timestamp      #时间差
+        TDOA_MA_S1 = MA_S1_common_base_timestamp - S1_common_base_timestamp      
         TDOA_MA_S2 = MA_S2_common_base_timestamp - S2_common_base_timestamp
 
         TDOA_MA_S1 *= c       #距离差
@@ -786,39 +775,38 @@ class SerialAssistant:
           
     
     def open_coordinate_settings(self):
-        settings_window = tk.Toplevel()  # 创建新的Toplevel窗口
+        settings_window = tk.Toplevel()  
         settings_window.title("Settings")
-        settings_window.geometry("500x150")  # 设置窗口大小
+        settings_window.geometry("500x150")  
 
-        # 在设置窗口中添加一些设置选项
         ttk.Label(settings_window, text="Master_X:"+ Emoji._ITEMS[-106:][7].char,bootstyle = "danger").grid(row=0, column=0)
         Master_X = tk.StringVar()
-        Master_X.set(5)  # 默认值
+        Master_X.set(5)  
         ttk.Entry(settings_window, textvariable=Master_X,bootstyle = "info").grid(row=0, column=1)
 
         ttk.Label(settings_window, text="Master_Y:"+ Emoji._ITEMS[-106:][7].char,bootstyle = "danger").grid(row=0, column=2)
         Master_Y = tk.StringVar()
-        Master_Y.set(1)  # 默认值
+        Master_Y.set(1)  
         ttk.Entry(settings_window, textvariable=Master_Y,bootstyle = "info").grid(row=0, column=3)
 
         ttk.Label(settings_window, text="Slave1_X:"+ Emoji._ITEMS[-106:][7].char,bootstyle = "danger").grid(row=1, column=0)
         Slave1_X = tk.IntVar()
-        Slave1_X.set(-2)  # 默认值
+        Slave1_X.set(-2)  
         ttk.Entry(settings_window, textvariable=Slave1_X,bootstyle = "info").grid(row=1, column=1)
 
         ttk.Label(settings_window, text="Slave1_Y:"+ Emoji._ITEMS[-106:][7].char,bootstyle = "danger").grid(row=1, column=2)
         Slave1_Y = tk.IntVar()
-        Slave1_Y.set(7)  # 默认值
+        Slave1_Y.set(7)  
         ttk.Entry(settings_window, textvariable=Slave1_Y,bootstyle = "info").grid(row=1, column=3)
 
         ttk.Label(settings_window, text="Slave2_X:"+ Emoji._ITEMS[-106:][7].char,bootstyle = "danger").grid(row=2, column=0)
         Slave2_X = tk.IntVar()
-        Slave2_X.set(10)  # 默认值
+        Slave2_X.set(10)  
         ttk.Entry(settings_window, textvariable=Slave2_X,bootstyle = "info").grid(row=2, column=1)
 
         ttk.Label(settings_window, text="Slave2_Y:"+ Emoji._ITEMS[-106:][7].char,bootstyle = "danger").grid(row=2, column=2)
         Slave2_Y = tk.IntVar()
-        Slave2_Y.set(7)  # 默认值
+        Slave2_Y.set(7)  
         ttk.Entry(settings_window, textvariable=Slave2_Y,bootstyle = "info").grid(row=2, column=3)
 
         # 保存锚点坐标
@@ -843,7 +831,7 @@ class SerialAssistant:
         
         #多项式回归
         #model = LinearRegression()
-        #弹性网回归
+
         model = ElasticNet(alpha=1.0, l1_ratio=0.5)
         model.fit(x_poly,CoorY_Arr)
         
@@ -856,36 +844,31 @@ class SerialAssistant:
 
         return int(CoorX_Arr[-1]),int(y_pre)
 
-    #移动平均处理数据
     def moving_average(self,data, window_size):
         cumsum_vec = np.cumsum(np.insert(data, 0, 0))
         return (cumsum_vec[window_size:] - cumsum_vec[:-window_size]) / window_size
     
     def Z_Score(self,ArrX,ArrY):
-        #print(f'arr_x len={len(ArrX)}, arr_y len={len(ArrY)}')
         threshold_x = 3
         data        = np.concatenate((ArrX[:, np.newaxis], ArrY[:, np.newaxis]), axis=1)
         mean_x      = np.mean(ArrX)
         std_dev_x   = np.std(ArrX)
         z_scores_x  = (ArrX - mean_x) / std_dev_x
-        #print(ArrX)
-        #print(z_scores_x)
         
         outliers_x      = np.abs(z_scores_x) > threshold_x
         filtered_data_x = data[~outliers_x]
         new_arr_x       = filtered_data_x[:,0]
         new_arr_y       = filtered_data_x[:,1]
-        #print(f'new_x len={len(new_arr_x)},new_y len={len(new_arr_y)}')
         if len(new_arr_x) < len(ArrX):
             print(f'delete corrdinate is :{data[outliers_x]}')
         
         return new_arr_x , new_arr_y
 
     def show_about(self):
-        messagebox.showinfo("关于", "UwbCOM v1.0\n\n"
-                             "版权所有 © 2024 可为有限公司\n"
+        messagebox.showinfo("关于", "UwbCOM v1.1\n\n"
+                             "版权所有 © 2024 可为信息技术有限公司\n"
                              "Author: @QLL\n"
-                             "Email: ximing766@gmail.com\n"
+                             "Email: qill@cardshare.cn\n"
                             )
             
     def run_UWB_Lift_Animation_plan_1(self):
@@ -905,28 +888,23 @@ def main():
     def change_theme(theme_name):
         style.theme_use(theme_name)
 
-    # 创建菜单栏
     menubar = tk.Menu(root)  
     root.config(menu=menubar)
     
-    # 创建主题菜单
     theme_menu = tk.Menu(menubar, tearoff=0)
     menubar.add_cascade(label="主题", menu=theme_menu) 
     for theme in themes:
         theme_menu.add_command(label=theme, command=lambda t=theme: change_theme(t))
 
-    # 创建关于菜单
     about_menu = tk.Menu(menubar, tearoff=0)
     menubar.add_cascade(label="关于", menu=about_menu)
     about_menu.add_command(label="关于", command=app.show_about)
 
-    #滤波算法选择菜单
     filter_menu = tk.Menu(menubar, tearoff=0)
     menubar.add_cascade(label="滤波", menu=filter_menu)
     kalman_filter_menu = filter_menu.add_command(label="Kalman-Filter", command=lambda:app.change_filter(True))
     elasticnet_filter_menu = filter_menu.add_command(label="ElasticNet", command=lambda:app.change_filter(False))
     
-
     root.mainloop()
 
 if __name__ == "__main__":
