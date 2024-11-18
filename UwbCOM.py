@@ -35,9 +35,10 @@ class SerialAssistant:
         # print(self.config.get('DEFAULT', 'Version',fallback = 'unknow'))
         # self.version = self.config['DEFAULT']['Version']
         # self.Window = self.config['DEFAULT']['Window']
+        # test
 
         self.master.title("UwbCOM V1.1")
-        self.master.minsize(800, 800)
+        self.master.minsize(800, 839)
         self.master.geometry("850x820")
         icon_path = os.path.join(os.path.dirname(__file__), 'UWBCOM.ico')
         self.master.wm_iconbitmap(icon_path)
@@ -316,11 +317,22 @@ class SerialAssistant:
         '''
         description: 画布区域
         '''        
-        frame_draw = ttk.LabelFrame(self.master,text = "画布区",bootstyle="info")
+        frame_draw = ttk.LabelFrame(self.master,text = "功能区",bootstyle="info")
         frame_draw.grid(row=3, column=0, padx=5, pady=5,sticky='nsew')
         frame_draw.grid_columnconfigure(0, weight=1)
 
-        self.canvas = tk.Canvas(frame_draw,bg="white",height=400)
+        self.notebook = ttk.Notebook(frame_draw)
+        self.notebook.grid(row = 0, column = 0, padx = 1, pady = 1, sticky = 'nsew')
+
+        self.canvas_frame = ttk.Frame(self.notebook)
+        self.notebook.add(self.canvas_frame, text = '画布')
+        self.canvas_frame.grid_columnconfigure(0, weight=1)
+
+        self.other_frame = ttk.Frame(self.notebook)
+        self.notebook.add(self.other_frame, text = 'others')
+        self.other_frame.grid_columnconfigure(0, weight=1)
+
+        self.canvas = tk.Canvas(self.canvas_frame,bg="white",height=400)
         self.canvas.grid(row=0, column=0, padx=5, pady=5,sticky='nsew')
 
         #绘制画布边界
