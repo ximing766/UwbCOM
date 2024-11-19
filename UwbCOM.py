@@ -51,6 +51,28 @@ class SerialAssistant:
         self.bytesize     = serial.EIGHTBITS            
         self.parity       = serial.PARITY_NONE          
         self.stopbits     = serial.STOPBITS_ONE         
+
+        self.colors = [        # 20
+                'darkred',     # 深红色
+                'pink',        # 粉红色
+                'black',       # 黑色
+                'violet',      # 紫罗兰色
+                'gray',        # 灰色
+                'yellow',      # 黄色2
+                'orange',      # 橙色
+                'purple',      # 紫色
+                'royalblue',   # 皇家蓝
+                'brown',       # 棕色
+                'saddlebrown', # 马鞍棕
+                'salmon',      # 鲑鱼色
+                'wheat',       # 小麦色
+                'royalblue',   # 皇家蓝
+                'whitesmoke',  # 白烟色
+                'sienna',      # 赭色
+                'violet',      # 紫罗兰色
+                'wheat',       # 小麦色
+                'whitesmoke',  # 白烟色
+            ]
         
         self.distance_list = [{
             "GateDistance"  : 0,
@@ -65,9 +87,11 @@ class SerialAssistant:
             "lift_deep"     : 0,
             "KF"            : KalmanFilter(0.5, 2, 2), 
             "KF_predict"    : [0, 0],
+            "speed"         : 0,
         } for _ in range(20)]  
         #self.distance_list = [self.initial_dict.copy() for _ in range(20)]  #初始化20个用户的数据
         self.user_oval = {}
+        self.user_txt  = {}
 
         ## ** User Define ** ##
         #Emoji._ITEMS[i].name                               "🤨"
@@ -143,27 +167,27 @@ class SerialAssistant:
         frame_settings.grid_columnconfigure(4, weight=1)
         frame_settings.grid_columnconfigure(5, weight=1)
 
-        ttk.Label(frame_settings, text="COM" + Emoji._ITEMS[-106:][7].char,bootstyle="danger").grid(row=0, column=0, padx=1, pady=5,sticky='w')
+        ttk.Label(frame_settings, text="COM" + Emoji._ITEMS[-106:][7].char,bootstyle="warning").grid(row=0, column=0, padx=1, pady=5,sticky='w')
         self.port_var = tk.StringVar()
 
-        self.combo = ttk.Combobox(frame_settings, values=self.get_serial_ports(),bootstyle="primary")
+        self.combo = ttk.Combobox(frame_settings, values=self.get_serial_ports(),bootstyle="info")
         self.update_combobox()
         self.combo.grid(row=0, column=1, padx=1, pady=5,sticky='we')
 
-        ttk.Label(frame_settings, text="Baud" + Emoji._ITEMS[-106:][-4].char,bootstyle="danger").grid(row=1, column=0, padx=1, pady=5,sticky='w')
+        ttk.Label(frame_settings, text="Baud" + Emoji._ITEMS[-106:][-4].char,bootstyle="warning").grid(row=1, column=0, padx=1, pady=5,sticky='w')
         self.baudrate_var = tk.IntVar()
         
-        self.baudCombo = ttk.Combobox(frame_settings,values=['3000000','115200','9600'],bootstyle="primary")
+        self.baudCombo = ttk.Combobox(frame_settings,values=['3000000','115200','9600'],bootstyle="info")
         self.baudCombo.current(0)
         self.baudCombo.grid(row=1, column=1, padx=1, pady=5,sticky='we')
 
         button_width = 8
         entry_width  = 20
 
-        self.serial_bt = ttk.Button(frame_settings, text="打开串口", command=self.open_serial, width=button_width,bootstyle="primary")
+        self.serial_bt = ttk.Button(frame_settings, text="打开串口", command=self.open_serial, width=button_width,bootstyle="info")
         self.serial_bt.grid(row=0, column=2, padx=5, pady=5,sticky='ns')
 
-        self.modeCombo = ttk.Combobox(frame_settings,values=['GATE','LIFT','UL-TDOA','DL-TDOA'],width=button_width,bootstyle="primary")
+        self.modeCombo = ttk.Combobox(frame_settings,values=['GATE','LIFT','UL-TDOA','DL-TDOA'],width=button_width,bootstyle="info")
         self.modeCombo.current(0)
         self.modeCombo.grid(row=1, column=2, padx=5, pady=5,sticky='ns')
         self.modeCombo.bind("<<ComboboxSelected>>", self.on_mode_change)
@@ -515,8 +539,8 @@ class SerialAssistant:
                             
                             if self.modeCombo.get() == "LIFT":
                                 self.y = math.sqrt(abs(self.y**2 - 35*35))  
-
                             self.y = self.y + 60 
+                            self.cacl_speed(idx, self.x, self.y)
                             self.text_box2.insert(tk.END,f"<user,x,y>, {idx} , {self.x-400:.0f} , {self.y-60:.0f}\n")
                             self.text_box2.see(tk.END)
                             
@@ -529,7 +553,7 @@ class SerialAssistant:
                                 prediction = prediction.T.tolist()[0]
                                 print(f"KF_Filter : user {idx} prediction = {int(prediction[0]-400),int(prediction[1]-60)}")
                                 self.distance_list[idx]["KF_predict"] = prediction
-                                self.draw_user_KF(self.distance_list[idx]["KF_predict"],idx)  
+                                self.draw_user_KF(self.distance_list[idx]["KF_predict"],idx)
                             else:
                                 self.distance_list[idx]['ZScoreFlag'] += 1
                                 self.distance_list[idx]['CoorX_Arr']   = np.append(self.distance_list[idx]['CoorX_Arr'],self.x)
@@ -576,27 +600,41 @@ class SerialAssistant:
                 return True
         return False
     
+    def cacl_speed(self,idx,x,y):
+        if self.Use_KF == True:
+            if self.distance_list[idx]['KF_predict'] is not None and np.any(self.distance_list[idx]['KF_predict']):
+                speed = math.sqrt( (self.distance_list[idx]["KF_predict"][0] - x)**2 + 
+                                (self.distance_list[idx]["KF_predict"][1] - y)**2) * 4
+                self.distance_list[idx]['speed'] = int(speed)
+                return
+        if self.distance_list[idx]['CoorX_Arr'] is not None and np.any(self.distance_list[idx]['CoorX_Arr']):
+            speed = math.sqrt( (self.distance_list[idx]['CoorX_Arr'][-1] - x)**2 + 
+                            (self.distance_list[idx]['CoorY_Arr'][-1] - y)**2) * 4
+            self.distance_list[idx]['speed'] = int(speed)
+    
     '''
     description: 
     param {*} uniform_speed  1:匀速运动  2:减速运动 待开发 3:加速运动 待开发
     '''    
-    def move_oval(self,canvas, oval, start_x, start_y, end_x, end_y, uniform_speed=1):
+    def move_oval(self,canvas, oval, txt, start_x, start_y, end_x, end_y, uniform_speed=1):
         if uniform_speed == 1:
             self.x_move = (end_x - start_x) / 10
             self.y_move = (end_y - start_y) / 10
         
         canvas.move(oval, self.x_move, self.y_move)
+        canvas.move(txt, self.x_move, self.y_move)
         self.move_times += 1
         print(f"X_move = {self.x_move} Y_move = {self.y_move} moveing...{self.move_times}")
         if self.move_times < self.max_moves and abs(start_x + self.x_move - end_x) > 1 and abs(start_y + self.y_move - end_y) > 1:
-            canvas.after(10, self.move_oval, canvas, oval, start_x + self.x_move, start_y + self.y_move, end_x, end_y, 0)
+            canvas.after(10, self.move_oval, canvas, oval, txt, start_x + self.x_move, start_y + self.y_move, end_x, end_y, 0)
         else:
             self.move_times = 0
             canvas.coords(oval, end_x - 5, end_y - 5, end_x + 5, end_y + 5)
+            canvas.coords(txt, end_x, end_y + 15)
 
     def draw_user_EN(self,user,idx):
-        colors = ['purple',  'teal','magenta', 'green', 'blue', 'yellow', 'orange', 'purple', 'pink', 'brown', 'gray', 'cyan', 'red', 'navy', 'maroon', 'olive', 'lime', 'aqua', 'indigo' ,'plum']
         tags   = "user" + str(idx)
+        txtags = "usertxt" + str(idx)
         # self.canvas.delete(tags)
         #用户被遮挡，绘制扩展区域
         selected_mode = self.modeCombo.get()
@@ -611,8 +649,11 @@ class SerialAssistant:
                                             60+self.Master2SlverDistance/2, start=180, extent=180, fill='#FF6347',outline="#FF6347")
                         if self.canvas.find_withtag(tags):
                             self.canvas.delete(tags)
+                            self.canvas.delete(txtags)
                             self.user_oval[f'user_{idx}_oval'] = self.canvas.create_oval(user[idx]['Start_X']-5, user[idx]['Start_X']-5, user[idx]['Start_X']+5,  
-                                                                         user[idx]['Start_X']+5, outline=colors[idx], fill=colors[idx],tags=("user" + str(idx)))
+                                                                                         user[idx]['Start_X']+5, outline=self.colors[idx], fill=self.colors[idx],tags=("user" + str(idx)))
+                            self.user_txt[f'user_{idx}_txt'] = self.canvas.create_text(user[idx]['CoorX_Arr'][-1], user[idx]['CoorY_Arr'][-1]+15, 
+                                                                                        text=f'U{idx} : {self.distance_list[idx]["speed"]}cm/s', fill=self.colors[idx],tags=("usertxt" + str(idx)))
                     else:
                         self.canvas.create_arc(400-self.Master2SlverDistance/2 - 7.5, 60-self.red_height/2 -7.5, 400+self.Master2SlverDistance/2 + 7.5, \
                                             60+self.red_height/2 +7.5, start=180, extent=180, fill='plum',outline="plum",tags="nLos") #FFA54F
@@ -622,8 +663,11 @@ class SerialAssistant:
                         
                         if self.canvas.find_withtag(tags):
                             self.canvas.delete(tags)
-                            self.user_oval[f'user_{idx}_oval'] = self.canvas.create_oval(user[idx]['Start_X']-5, user[idx]['Start_Y']-5, user[idx]['Start_X']+5,  
-                                                                         user[idx]['Start_Y']+5, outline=colors[idx], fill=colors[idx],tags=("user" + str(idx)))
+                            self.canvas.delete(txtags)
+                            self.user_oval[f'user_{idx}_oval'] = self.canvas.create_oval(user[idx]['Start_X']-5, user[idx]['Start_Y']-5, user[idx]['Start_X']+5,
+                                                                                         user[idx]['Start_Y']+5, outline=self.colors[idx], fill=self.colors[idx],tags=("user" + str(idx)))
+                            self.user_txt[f'user_{idx}_txt'] = self.canvas.create_text(user[idx]['CoorX_Arr'][-1], user[idx]['CoorY_Arr'][-1]+15, 
+                                                                                        text=f'U{idx} : {self.distance_list[idx]["speed"]}cm/s',fill=self.colors[idx],tags=("usertxt" + str(idx)))
                         
             elif self.canvas.find_withtag("nLos"):
                 self.canvas.delete("nLos")
@@ -631,15 +675,17 @@ class SerialAssistant:
         if not self.canvas.find_withtag(tags): 
             print(f'Create user_{idx}')
             self.user_oval[f'user_{idx}_oval'] = self.canvas.create_oval(user[idx]['CoorX_Arr'][-1]-5, user[idx]['CoorY_Arr'][-1]-5, user[idx]['CoorX_Arr'][-1]+5,  
-                                                                         user[idx]['CoorY_Arr'][-1]+5, outline=colors[idx], fill=colors[idx],tags=("user" + str(idx)))
+                                                                         user[idx]['CoorY_Arr'][-1]+5, outline=self.colors[idx], fill=self.colors[idx],tags=("user" + str(idx)))
+            self.user_txt[f'user_{idx}_txt'] = self.canvas.create_text(user[idx]['CoorX_Arr'][-1], user[idx]['CoorY_Arr'][-1]+15, 
+                                                                        text=f'U{idx} : {self.distance_list[idx]["speed"]}cm/s', fill=self.colors[idx],tags=("usertxt" + str(idx)))
         else:
-            self.move_oval(self.canvas,self.user_oval[f'user_{idx}_oval'],user[idx]['Start_X'],user[idx]['Start_Y'],user[idx]['CoorX_Arr'][-1],user[idx]['CoorY_Arr'][-1])
+            self.canvas.itemconfigure(self.user_txt[f'user_{idx}_txt'], text=f'U{idx} : {self.distance_list[idx]["speed"]}cm/s')
+            self.move_oval(self.canvas, self.user_oval[f'user_{idx}_oval'], self.user_txt[f'user_{idx}_txt'], user[idx]['Start_X'], user[idx]['Start_Y'], user[idx]['CoorX_Arr'][-1], user[idx]['CoorY_Arr'][-1])
             # print(f'Begin X: {user[idx]["Start_X"]}, Begin Y: {user[idx]["Start_Y"]}, End X: {user[idx]["CoorX_Arr"][-1]}, End Y: {user[idx]["CoorY_Arr"][-1]}')
         user[idx]['Start_X'] = user[idx]['CoorX_Arr'][-1]
         user[idx]['Start_Y'] = user[idx]['CoorY_Arr'][-1]
     
     def draw_user_KF(self,user,idx):
-        colors = ['olive', 'lime', 'aqua', 'indigo' ,'plum','purple',  'teal','magenta', 'green', 'blue', 'yellow', 'orange', 'pink', 'brown', 'gray', 'cyan', 'red', 'navy', 'maroon']
         tags   = "user" + str(idx)
         # self.canvas.delete(tags)
 
@@ -656,9 +702,12 @@ class SerialAssistant:
         #         self.canvas.delete("nLos")
 
         if not self.canvas.find_withtag(tags): 
-            self.user_oval[f'user_{idx}_oval'] = self.canvas.create_oval(user[0]-5, user[1]-5, user[0]+5, user[1]+5,outline=colors[idx], fill=colors[idx],tags=("user" + str(idx)))
+            self.user_oval[f'user_{idx}_oval'] = self.canvas.create_oval(user[0]-5, user[1]-5, user[0]+5, user[1]+5,outline=self.colors[idx], fill=self.colors[idx],tags=("user" + str(idx)))
+            self.user_txt[f'user_{idx}_txt'] = self.canvas.create_text(user[idx]['CoorX_Arr'][-1], user[idx]['CoorY_Arr'][-1]+15, 
+                                                                        text=f'U{idx} : {self.distance_list[idx]["speed"]}cm/s', fill=self.colors[idx],tags=("usertxt" + str(idx)))
         else:
-            self.move_oval(self.canvas,self.user_oval[f'user_{idx}_oval'],self.distance_list[idx]['Start_X'],self.distance_list[idx]['Start_Y'],user[0],user[1])
+            self.canvas.itemconfigure(self.user_txt[f'user_{idx}_txt'], text=f'U{idx} : {self.distance_list[idx]["speed"]}cm/s')
+            self.move_oval(self.canvas,self.user_oval[f'user_{idx}_oval'], self.user_txt[f'user_{idx}_txt'], self.distance_list[idx]['Start_X'], self.distance_list[idx]['Start_Y'], user[0], user[1])
         self.distance_list[idx]['Start_X'] = int(user[0])
         self.distance_list[idx]['Start_Y'] = int(user[1])
     
@@ -894,7 +943,7 @@ def main():
     root   = tk.Tk()
     themes = ['cosmo', 'flatly', 'litera', 'minty', 'lumen', 'sandstone', 'yeti', 'pulse', 'united', 'morph', 'journal', 'darkly', 'superhero', \
               'solar', 'cyborg', 'vapor', 'simplex', 'cerculean']
-    style = ttk.Style("minty")
+    style = ttk.Style("yeti")
     app   = SerialAssistant(root)
     print(style.theme_names())
     def change_theme(theme_name):
