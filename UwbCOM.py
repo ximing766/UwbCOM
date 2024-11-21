@@ -38,7 +38,7 @@ class SerialAssistant:
         # self.Window = self.config['DEFAULT']['Window']
         # test
 
-        self.master.title("UwbCOM V1.1")
+        self.master.title("UwbCOM V1.2")
         self.master.minsize(800, 839)
         self.master.geometry("850x820")
         icon_path = os.path.join(os.path.dirname(__file__), 'UWBCOM.ico')
