@@ -81,7 +81,8 @@ class SerialAssistant:
             "SlaverDistance": 0,
             "CoorX_Arr"     : np.array([]),
             "CoorY_Arr"     : np.array([]),
-            "Start_X"       : 0,
+            "CoorZ_Arr"     : np.array([]),
+            "Start_X"       : 0,                       # User Moveing Start Point
             "Start_Y"       : 0,
             "ZScoreFlag"    : 0,                       # Z-Score异常值处理标志, 记录未经过Z-Score处理过的新坐标数量
             "nLos"          : 0,                      
@@ -838,9 +839,9 @@ class SerialAssistant:
 
         # 保存锚点坐标
         def save_settings():
-            self.master_position = (round(Master_X.get()), round(Master_Y.get()))
-            self.slave1_position = (round(Slave1_X.get()), round(Slave1_Y.get()))
-            self.slave2_position = (round(Slave2_X.get()), round(Slave2_Y.get()))
+            self.master_position = (int(Master_X.get()), int(Master_Y.get()))
+            self.slave1_position = (int(Slave1_X.get()), int(Slave1_Y.get()))
+            self.slave2_position = (int(Slave2_X.get()), int(Slave2_Y.get()))
             self.Anchor_position = [self.master_position,self.slave1_position,self.slave2_position]
             messagebox.showinfo("Settings Saved", f"Master_X: {Master_X.get()}, Master_Y: {Master_Y.get()},Slave1_X: {Slave1_X.get()}, Slave1_Y: {Slave1_Y.get()},Slave2_X: {Slave2_X.get()}, Slave2_Y: {Slave2_Y.get()}")
             settings_window.destroy()
@@ -897,7 +898,7 @@ class SerialAssistant:
                              "Author: @QLL\n"
                              "Email: qill@cardshare.cn\n"
                             )
-            
+        
     def run_UWB_Lift_Animation_plan_1(self):
         uwb_animation = UWBLiftAnimationPlan1(radius=self.radius,lift_deep=self.lift_deep,lift_height=self.lift_height)
         uwb_animation.start_animation()
