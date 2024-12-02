@@ -33,12 +33,11 @@ class SerialAssistant:
 
         # self.config = configparser.ConfigParser()
         # self.config.read('./config/init.ini')
-        # print(self.config.get('DEFAULT', 'Version',fallback = 'unknow'))
         # self.version = self.config['DEFAULT']['Version']
         # self.Window = self.config['DEFAULT']['Window']
         # test
 
-        self.master.title("UwbCOM V1.2")
+        self.master.title("UwbCOM V1.3")
         self.master.minsize(800, 839)
         self.master.geometry("850x820")
         icon_path = os.path.join(os.path.dirname(__file__), 'UWBCOM.ico')
@@ -54,9 +53,9 @@ class SerialAssistant:
         self.stopbits     = serial.STOPBITS_ONE         
 
         self.colors = [        # 20
+                'black',       # 黑色
                 'darkred',     # 深红色
                 'pink',        # 粉红色
-                'black',       # 黑色
                 'violet',      # 紫罗兰色
                 'gray',        # 灰色
                 'yellow',      # 黄色2
@@ -73,7 +72,7 @@ class SerialAssistant:
                 'violet',      # 紫罗兰色
                 'wheat',       # 小麦色
                 'whitesmoke',  # 白烟色
-            ]
+        ]
         
         self.distance_list = [{
             "GateDistance"  : 0,
@@ -84,16 +83,20 @@ class SerialAssistant:
             "CoorZ_Arr"     : np.array([]),
             "Start_X"       : 0,                       # User Moveing Start Point
             "Start_Y"       : 0,
+            "Start_X_AOA"   : 0,
+            "Start_Y_AOA"   : 0,
             "ZScoreFlag"    : 0,                       # Z-Score异常值处理标志, 记录未经过Z-Score处理过的新坐标数量
             "nLos"          : 0,                      
-            "lift_deep"     : 0,
+            "lift_deep"     : 0, 
             "KF"            : KalmanFilter(0.5, 2, 2), 
             "KF_predict"    : [0, 0],
             "speed"         : deque(maxlen=4),
         } for _ in range(20)]  
         #self.distance_list = [self.initial_dict.copy() for _ in range(20)]  #初始化20个用户的数据
-        self.user_oval = {}
-        self.user_txt  = {}
+        self.user_oval     = {}
+        self.user_oval_aoa = {}
+        self.user_txt      = {}
+        self.user_txt_aoa  = {}
 
         ## ** User Define ** ##
         #Emoji._ITEMS[i].name                               "🤨"
@@ -102,7 +105,8 @@ class SerialAssistant:
         self.init_draw            = 0                       #限制除用户外，其它图形多次作图
         self.flag_str             = ""                      #判断需要获取的卡信息种类
         self.Master2SlverDistance = 0                       
-        self.radius               = 0                      
+        self.radius               = 0  
+        self.nLos_radis           = 0         
         self.lift_deep            = 0                       
         self.lift_height          = 0                       
         self.red_height           = 0
@@ -120,18 +124,18 @@ class SerialAssistant:
 
         self.x                    = 0
         self.y                    = 0
+        self.z                    = 0
         self.cor                  = []
-        self.Use_KF               = False                    
+        self.Use_KF               = False    
+        self.Use_AOA              = False   
 
         self.CallCount            = 0
         self.current_time         = 0
         self.last_call_time       = 0
-        self.max_moves            = 10
+        self.max_moves            = 15
         self.move_times           = 0
         self.x_move               = 0
         self.y_move               = 0
-
-        print(Emoji._ITEMS[-106:])
 
         self.create_widgets()
 
@@ -375,17 +379,6 @@ class SerialAssistant:
         else:
             self.serial_bt.config(text="打开串口", command=self.open_serial,bootstyle="primary")
 
-    def open_serial(self):
-        try:
-            self.serial      = serial.Serial(self.combo.get(), self.baudCombo.get(), timeout=1)
-            self.read_thread = threading.Thread(target=self.read_data)
-            self.read_thread.start()
-            self.serial_open = True
-            self.update_serial_button()
-
-        except Exception as e:
-            self.text_box.insert(tk.END, f"打开串口失败: {e}\n")
-
     def close_serial(self):
         if self.serial: 
             self.serial.close()
@@ -406,7 +399,6 @@ class SerialAssistant:
             self.text_area4.delete(0,tk.END)
         elif flag == 3:
             content = self.text_box.get("1.0",tk.END)
-            # print(content)
             filename = "E:/Distance_content.txt"
             try:
                 with open(filename,"w" ,encoding="utf-8") as file:
@@ -427,7 +419,6 @@ class SerialAssistant:
     
     def send_data(self,flag):
         self.flag_str = str(flag)
-        print("flag is :",self.flag_str)
         self.serial.write(self.flag_str.encode())
         
     def show_cardData(self,data):
@@ -474,6 +465,22 @@ class SerialAssistant:
         else:
             messagebox.showinfo("tips","filter has been changed to ElasticNet" );
     
+    def open_serial(self):
+        try:
+            self.serial = serial.Serial(self.combo.get(), self.baudCombo.get(), timeout=1)
+            
+            self.data_queue  = queue.Queue()
+            self.read_thread = threading.Thread(target=self.read_data)
+            self.read_thread.start()
+            self.draw_thread = threading.Thread(target=self.draw_data)
+            self.draw_thread.start()
+
+            self.serial_open = True
+            self.update_serial_button()
+
+        except Exception as e:
+            self.text_box.insert(tk.END, f"打开串口失败: {e}\n")
+    
     def UL_read_data(self,port,baudrate,queue):
         ser = serial.Serial(port, baudrate, timeout=1)
         while True:
@@ -498,19 +505,16 @@ class SerialAssistant:
                 print(f"@ Location has been updated {self.CallCount} times in the last second.")
                 self.CallCount = 0 
                 self.last_call_time = self.current_time
-
             try:
                 if (data := self.serial.readline()):
                     data = data.decode('utf-8',errors='replace')
                     if self.CardInfo in data:
-                        # print(data)
                         self.show_cardData(data)                                            
                     if self.PosInfo in data:               
-                        # print(data)
                         try:
                             json_data = json.loads(data)
                         except json.JSONDecodeError as e:
-                            print("解析错误：", e)
+                            print("json error", e)
                         idx = json_data['idx']
                         if 0 <= idx < len(self.distance_list):
                             self.distance_list[idx]['MasterDistance'] = json_data['Master']
@@ -518,15 +522,20 @@ class SerialAssistant:
                             self.distance_list[idx]['GateDistance']   = json_data['Gate']
                             self.distance_list[idx]['nLos']           = json_data['nLos']
                             self.distance_list[idx]['lift_deep']      = json_data['LiftDeep']
+                            if json_data['User-Z'] !=0:
+                                self.Use_AOA = True
+                            self.x_offset = 200 if self.Use_AOA else 400
+                            self.distance_list[idx]['CoorX_Arr']   = np.append(self.distance_list[idx]['CoorX_Arr'], self.x_offset + json_data['User-X'])
+                            self.distance_list[idx]['CoorY_Arr']   = np.append(self.distance_list[idx]['CoorY_Arr'], 60 + json_data['User-Y'])
+                            self.distance_list[idx]['CoorZ_Arr']   = np.append(self.distance_list[idx]['CoorZ_Arr'], json_data['User-Z'])
                             
                             self.distance_list[idx]['speed'].append(json_data['Speed'])
-                            print(f'User-{idx} Speed: {round(np.average(json_data["Speed"]))} cm/s')
+                            # print(f'User-{idx} Speed: {round(np.average(json_data["Speed"]))} cm/s')
 
                             if json_data['RedAreaH'] != self.red_height or json_data['BlueAreaH'] != self.blue_height:
                                 self.red_height                           = json_data['RedAreaH']
                                 self.blue_height                          = json_data['BlueAreaH']
-                                print(f"RedAreaH: {self.red_height}  BlueAreaH: {self.blue_height}")
-                                self.draw_basic()
+                                self.draw_basic(idx)
                         else:
                             print(f"Invalid index: {idx}")
                             continue
@@ -537,72 +546,82 @@ class SerialAssistant:
                         
                         if self.Master2SlverDistance == 0:
                             self.Master2SlverDistance = self.distance_list[idx]['GateDistance']
-                            self.on_mode_change()
-                    
-                        if self.distance_list[idx]['MasterDistance'] != 0 and self.distance_list[idx]['SlaverDistance'] != 0 and self.distance_list[idx]['GateDistance'] !=0:
-                            self.x = 400 + round(((self.distance_list[idx]['SlaverDistance']**2 - self.distance_list[idx]['MasterDistance']**2) / (2*self.distance_list[idx]['GateDistance'])))
-                            self.y = round(math.sqrt(abs(self.distance_list[idx]['MasterDistance']**2 - (self.x - (400 + self.distance_list[idx]['GateDistance']/2))**2)))
-                            
-                            if self.modeCombo.get() == "LIFT":
-                                self.y = math.sqrt(abs(self.y**2 - 35*35))  
-                            self.y = self.y + 60 
-                            # self.cacl_speed(idx, self.x, self.y)
-                            self.text_box2.insert(tk.END,f"<user,x,y>, {idx} , {self.x-400:.0f} , {self.y-60:.0f}\n")
-                            self.text_box2.see(tk.END)
-                            
-                            if self.Use_KF == True:
-                                self.cor = [self.x,self.y]
-                                user_kf  = self.distance_list[idx]['KF']
-                                z        = np.matrix(self.cor).T
-                                user_kf.predict()
-                                prediction = user_kf.update(z)
-                                prediction = prediction.T.tolist()[0]
-                                print(f"KF_Filter : user {idx} prediction = {round(prediction[0]-400),round(prediction[1]-60)}")
-                                self.distance_list[idx]["KF_predict"] = prediction
-                                self.draw_user_KF(self.distance_list[idx]["KF_predict"],idx)
-                            else:
-                                self.distance_list[idx]['ZScoreFlag'] += 1
-                                self.distance_list[idx]['CoorX_Arr']   = np.append(self.distance_list[idx]['CoorX_Arr'],self.x)
-                                self.distance_list[idx]['CoorY_Arr']   = np.append(self.distance_list[idx]['CoorY_Arr'],self.y)
-                                
-                                if len(self.distance_list[idx]['CoorX_Arr']) == 20:                                                                
-                                    #异常值去除:Z-Score  ：每20轮调用一次，一次处理20组coornidate。保证所有数据都能被处理的同时，最大程度消减新coornidate移动带来的偏差。
-                                    if self.distance_list[idx]['ZScoreFlag'] == len(self.distance_list[idx]['CoorX_Arr']):
-                                        self.distance_list[idx]['CoorX_Arr'] ,self.distance_list[idx]['CoorY_Arr'] = self.Z_Score(self.distance_list[idx]['CoorX_Arr'],self.distance_list[idx]['CoorY_Arr'])
-                                        self.distance_list[idx]['ZScoreFlag'] = 0
-                                    
-                                    if len(self.distance_list[idx]['CoorX_Arr']) < 20:
-                                        print('Z-Socre reduce some data,return.',len(self.distance_list[idx]['CoorX_Arr']))
-                                    else:
-                                        self.CallCount += 1
-                                        #19
-                                        self.distance_list[idx]['CoorX_Arr'] = self.moving_average(self.distance_list[idx]['CoorX_Arr'],2).astype(int)
-                                        self.distance_list[idx]['CoorY_Arr'] = self.moving_average(self.distance_list[idx]['CoorY_Arr'],2).astype(int)
+                            self.on_mode_change(idx)
 
-                                        self.predict_x,self.predict_y = self.predict_coor(self.distance_list[idx]['CoorX_Arr'],self.distance_list[idx]['CoorY_Arr'])
-                                        
-                                        #20
-                                        self.distance_list[idx]['CoorX_Arr'] = np.append(self.distance_list[idx]['CoorX_Arr'],self.predict_x)    
-                                        self.distance_list[idx]['CoorY_Arr'] = np.append(self.distance_list[idx]['CoorY_Arr'],self.predict_y)
-
-                                        if  abs(self.distance_list[idx]['Start_X'] - self.distance_list[idx]['CoorX_Arr'][-1]) > 2 and abs(self.distance_list[idx]['Start_Y'] - self.distance_list[idx]['CoorY_Arr'][-1]) > 2:
-                                            print("draw user!!!")
-                                            self.draw_user_EN(self.distance_list,idx)  
-
-                                        self.distance_list[idx]['CoorX_Arr'] = np.delete(self.distance_list[idx]['CoorX_Arr'],[0])           
-                                        self.distance_list[idx]['CoorY_Arr'] = np.delete(self.distance_list[idx]['CoorY_Arr'],[0])
-                                else:
-                                    pass
+                        self.x = self.distance_list[idx]['CoorX_Arr'][-1]
+                        self.y = self.distance_list[idx]['CoorY_Arr'][-1]
+                        self.z = self.distance_list[idx]['CoorZ_Arr'][-1]
+                        if self.modeCombo.get() == "LIFT":
+                            self.y = math.sqrt(abs(self.y**2 - 35*35))  
+                        self.text_box2.insert(tk.END,f"<user,x,y,z>, {idx} , {self.x-200:.0f} , {self.y-60:.0f} ,{self.z:.0f}\n")
+                        self.text_box2.see(tk.END)
+                        print("Use_KF:",self.Use_KF)
+                        if self.Use_KF == True:
+                            self.cor = [self.x,self.y]
+                            user_kf  = self.distance_list[idx]['KF']
+                            z        = np.matrix(self.cor).T
+                            user_kf.predict()
+                            prediction = user_kf.update(z)
+                            prediction = prediction.T.tolist()[0]
+                            print(f"KF_Filter : user {idx} prediction = {round(prediction[0]-400),round(prediction[1]-60)}")
+                            self.distance_list[idx]["KF_predict"] = prediction
+                            self.data_queue.put([self.distance_list[idx]["KF_predict"],idx])
+                            # self.draw_user_KF(self.distance_list[idx]["KF_predict"],idx)
                         else:
-                            print("E : Y is calculated negative!!!")
+                            self.distance_list[idx]['ZScoreFlag'] += 1
+                            if len(self.distance_list[idx]['CoorX_Arr']) == 20:                                                                
+                                #异常值去除:Z-Score  ：每20轮调用一次，一次处理20组coornidate。保证所有数据都能被处理的同时，最大程度消减新coornidate移动带来的偏差。
+                                if self.distance_list[idx]['ZScoreFlag'] == len(self.distance_list[idx]['CoorX_Arr']):
+                                    self.distance_list[idx]['CoorX_Arr'] ,self.distance_list[idx]['CoorY_Arr'] = self.Z_Score(self.distance_list[idx]['CoorX_Arr'],self.distance_list[idx]['CoorY_Arr'])
+                                    self.distance_list[idx]['ZScoreFlag'] = 0
+                                
+                                if len(self.distance_list[idx]['CoorX_Arr']) < 20:
+                                    print('Z-Socre reduce some data,return.',len(self.distance_list[idx]['CoorX_Arr']))
+                                else:
+                                    self.CallCount += 1
+                                    #19
+                                    self.distance_list[idx]['CoorX_Arr'] = self.moving_average(self.distance_list[idx]['CoorX_Arr'],2).astype(int)
+                                    self.distance_list[idx]['CoorY_Arr'] = self.moving_average(self.distance_list[idx]['CoorY_Arr'],2).astype(int)
+
+                                    self.predict_x,self.predict_y = self.predict_coor(self.distance_list[idx]['CoorX_Arr'],self.distance_list[idx]['CoorY_Arr'])
+                                    
+                                    #20
+                                    self.distance_list[idx]['CoorX_Arr'] = np.append(self.distance_list[idx]['CoorX_Arr'],self.predict_x)    
+                                    self.distance_list[idx]['CoorY_Arr'] = np.append(self.distance_list[idx]['CoorY_Arr'],self.predict_y)
+
+                                    if  abs(self.distance_list[idx]['Start_X'] - self.distance_list[idx]['CoorX_Arr'][-1]) > 2 or  \
+                                        abs(self.distance_list[idx]['Start_Y'] - self.distance_list[idx]['CoorY_Arr'][-1]) > 2:
+                                        self.data_queue.put([self.distance_list,idx])
+                                        # self.draw_user_EN(self.distance_list,idx)  
+
+                                    self.distance_list[idx]['CoorX_Arr'] = np.delete(self.distance_list[idx]['CoorX_Arr'],[0])           
+                                    self.distance_list[idx]['CoorY_Arr'] = np.delete(self.distance_list[idx]['CoorY_Arr'],[0])
+                            else:
+                                print("E : len(self.distance_list[idx]['CoorX_Arr']) = ",len(self.distance_list[idx]['CoorX_Arr']))
+                                self.distance_list[idx]['CoorX_Arr'] = self.distance_list[idx]['CoorX_Arr'][-19:]
+                                self.distance_list[idx]['CoorY_Arr'] = self.distance_list[idx]['CoorY_Arr'][-19:]
+                                self.distance_list[idx]['CoorZ_Arr'] = self.distance_list[idx]['CoorZ_Arr'][-19:]
             except serial.SerialException:
                 self.text_box.insert(tk.END, "串口连接已断开\n")
                 break
+    def draw_data(self):
+        while self.serial and self.serial.is_open:
+            try:
+                # 阻塞
+                data = self.data_queue.get()
+                if self.Use_KF:
+                    self.draw_user_KF(data[0], data[1])
+                else:
+                    self.draw_user_EN(data[0], data[1])
+            except Exception as e:
+                print(f"Error drawing data: {e}")
+            finally:
+                # 防止join线程阻塞
+                self.data_queue.task_done()  
 
     def check_nLos(self):
         for idx, item in enumerate(self.distance_list):
             if item.get('nLos') == 1:
-                # print(f"Found nLos == 1 at index {idx}")
                 return True
         return False
     
@@ -613,33 +632,52 @@ class SerialAssistant:
     description: 
     param {*} uniform_speed  1:匀速运动  2:减速运动 待开发 3:加速运动 待开发
     '''    
-    def move_oval(self,canvas, oval, txt, start_x, start_y, end_x, end_y, uniform_speed=1):
+    def move_oval(self,canvas, oval, txt, start_x, start_y, end_x, end_y, oval_aoa, txt_aoa, start_x_aoa,start_y_aoa,end_x_aoa,end_y_aoa ,uniform_speed=1):
         if uniform_speed == 1:
-            self.x_move = (end_x - start_x) / 10
-            self.y_move = (end_y - start_y) / 10
+            self.x_move = (end_x - start_x) / 15
+            self.y_move = (end_y - start_y) / 15
+            if self.Use_AOA:
+                self.x_move_aoa = (end_x_aoa - start_x_aoa) / 15
+                self.y_move_aoa = - (end_y_aoa - start_y_aoa) / 15
         
         canvas.move(oval, self.x_move, self.y_move)
         canvas.move(txt, self.x_move, self.y_move)
+        if self.Use_AOA:
+            canvas.move(oval_aoa, self.x_move_aoa, self.y_move_aoa)
+            canvas.move(txt_aoa, self.x_move_aoa, self.y_move_aoa)
         self.move_times += 1
         print(f"X_move = {self.x_move} Y_move = {self.y_move} moveing...{self.move_times}")
-        if self.move_times < self.max_moves and abs(start_x + self.x_move - end_x) > 1 and abs(start_y + self.y_move - end_y) > 1:
-            canvas.after(10, self.move_oval, canvas, oval, txt, start_x + self.x_move, start_y + self.y_move, end_x, end_y, 0)
+        if self.Use_AOA:
+            if self.move_times < self.max_moves and abs(start_x + self.x_move - end_x) > 0.1 and abs(start_y + self.y_move - end_y) > 0.1 and abs(start_y_aoa + self.y_move_aoa - end_y_aoa) > 0.1:
+                canvas.after(10, self.move_oval, canvas, oval, txt, start_x + self.x_move, start_y + self.y_move, end_x, end_y, 
+                                oval_aoa, txt_aoa, start_x_aoa + self.x_move_aoa, start_y_aoa + self.y_move_aoa, end_x_aoa, end_y_aoa,0)
+            else:
+                self.move_times = 0
+                canvas.coords(oval, end_x - 5, end_y - 5, end_x + 5, end_y + 5)
+                canvas.coords(txt, end_x, end_y + 15)
+                canvas.coords(oval_aoa, end_x_aoa - 5, end_y_aoa - 5, end_x_aoa + 5, end_y_aoa + 5)
+                canvas.coords(txt_aoa, end_x_aoa, end_y_aoa + 15)
         else:
-            self.move_times = 0
-            canvas.coords(oval, end_x - 5, end_y - 5, end_x + 5, end_y + 5)
-            canvas.coords(txt, end_x, end_y + 15)
+            if self.move_times < self.max_moves and abs(start_x + self.x_move - end_x) > 0.1 and abs(start_y + self.y_move - end_y) > 0.1:
+                canvas.after(10, self.move_oval, canvas, oval, txt, start_x + self.x_move, start_y + self.y_move, end_x, end_y, None, None, None, None, None, None, 0)
+            else:
+                self.move_times = 0
+                canvas.coords(oval, end_x - 5, end_y - 5, end_x + 5, end_y + 5)
+                canvas.coords(txt, end_x, end_y + 15)
 
     def draw_user_EN(self,user,idx):
         tags   = "user" + str(idx)
         speed = self.cacl_speed(idx)
 
         selected_mode = self.modeCombo.get()
+        self.nLos_radis = self.Master2SlverDistance/2 if self.red_height == 0 else self.red_height/2
         if  selected_mode == "GATE":
-            if self.check_nLos() == True:  # if anyone in nLos, do this
-                self.canvas.create_arc(400-self.Master2SlverDistance/2 - 7.5, 60-self.Master2SlverDistance/2 -7.5, 400+self.Master2SlverDistance/2 + 7.5, \
-                                            60+self.Master2SlverDistance/2 +7.5, start=180, extent=180, fill='plum',outline="plum",tags="nLos") #FFA54F
+            if self.check_nLos() and self.Use_AOA:  # if anyone in nLos, do this
+                self.canvas.create_arc(200-self.Master2SlverDistance/2 - 7.5, 60-self.nLos_radis -7.5, 200+self.Master2SlverDistance/2 + 7.5, 60+self.nLos_radis +7.5, start=180, extent=180, fill='plum',outline="plum",tags="nLos") #FFA54F
                 self.canvas.tag_raise("nLos", "blue")
-                        
+            elif self.check_nLos() == True and self.Use_AOA == False:
+                self.canvas.create_arc(400-self.Master2SlverDistance/2 - 7.5, 60-self.nLos_radis -7.5, 400+self.Master2SlverDistance/2 + 7.5, 60+self.nLos_radis +7.5, start=180, extent=180, fill='plum',outline="plum",tags="nLos") #FFA54F
+                self.canvas.tag_raise("nLos", "blue")
             elif self.canvas.find_withtag("nLos"):
                 self.canvas.delete("nLos")
         # create user in the first time
@@ -649,64 +687,106 @@ class SerialAssistant:
                                                                          user[idx]['CoorY_Arr'][-1]+5, outline=self.colors[idx], fill=self.colors[idx],tags=("user" + str(idx)))
             self.user_txt[f'user_{idx}_txt'] = self.canvas.create_text(user[idx]['CoorX_Arr'][-1], user[idx]['CoorY_Arr'][-1]+15, 
                                                                         text=f'U{idx} : {speed}cm/s', fill=self.colors[idx],tags=("usertxt" + str(idx)))
+            if self.Use_AOA:
+                self.user_oval_aoa[f'user_{idx}_oval_AOA'] = self.canvas.create_oval(user[idx]['CoorY_Arr'][-1]+440-5, 250 - user[idx]['CoorZ_Arr'][-1]-5, user[idx]['CoorY_Arr'][-1]+440+5,  
+                                                                         250 - user[idx]['CoorZ_Arr'][-1]+5, outline=self.colors[idx], fill=self.colors[idx],tags=("userAoA" + str(idx)))
+                self.user_txt_aoa[f'user_{idx}_txt_AOA'] = self.canvas.create_text(user[idx]['CoorY_Arr'][-1]+440, 250-user[idx]['CoorZ_Arr'][-1]+15, 
+                                                                        text=f"U{idx} height : {user[idx]['CoorZ_Arr'][-1]}", fill=self.colors[idx],tags=("usertxtAOA" + str(idx)))
         else:
             self.canvas.itemconfigure(self.user_txt[f'user_{idx}_txt'], text=f'U{idx} : {speed}cm/s')
-            self.move_oval(self.canvas, self.user_oval[f'user_{idx}_oval'], self.user_txt[f'user_{idx}_txt'], user[idx]['Start_X'], user[idx]['Start_Y'], user[idx]['CoorX_Arr'][-1], user[idx]['CoorY_Arr'][-1])
-
+            if self.Use_AOA:
+                self.canvas.itemconfigure(self.user_txt_aoa[f'user_{idx}_txt_AOA'], text=f"U{idx} height : {user[idx]['CoorZ_Arr'][-1]}")
+                self.move_oval(self.canvas, self.user_oval[f'user_{idx}_oval'], self.user_txt[f'user_{idx}_txt'], user[idx]['Start_X'], user[idx]['Start_Y'], user[idx]['CoorX_Arr'][-1], user[idx]['CoorY_Arr'][-1], \
+                                self.user_oval_aoa[f'user_{idx}_oval_AOA'], self.user_txt_aoa[f'user_{idx}_txt_AOA'], user[idx]['Start_X_AOA'], user[idx]['Start_Y_AOA'], user[idx]['CoorY_Arr'][-1]+440, 250 - user[idx]['CoorZ_Arr'][-1])
+            else:
+                self.move_oval(self.canvas, self.user_oval[f'user_{idx}_oval'], self.user_txt[f'user_{idx}_txt'], user[idx]['Start_X'], user[idx]['Start_Y'], user[idx]['CoorX_Arr'][-1], user[idx]['CoorY_Arr'][-1], None, None, None, None, None, None)
         user[idx]['Start_X'] = user[idx]['CoorX_Arr'][-1]
         user[idx]['Start_Y'] = user[idx]['CoorY_Arr'][-1]
+        user[idx]['Start_X_AOA'] = user[idx]['CoorY_Arr'][-1]+440
+        user[idx]['Start_Y_AOA'] = 250 - user[idx]['CoorZ_Arr'][-1]
     
     def draw_user_KF(self,user,idx):
         tags   = "user" + str(idx)
         speed = self.cacl_speed(idx)
         selected_mode = self.modeCombo.get()
+        self.nLos_radis = self.red_height/2 if self.red_height != 0 else self.Master2SlverDistance/2
         if  selected_mode == "GATE":
-            if self.check_nLos() == True:  # if anyone in nLos, do this
-                self.canvas.create_arc(400-self.Master2SlverDistance/2 - 7.5, 60-self.Master2SlverDistance/2 -7.5, 400+self.Master2SlverDistance/2 + 7.5, \
-                                            60+self.Master2SlverDistance/2 +7.5, start=180, extent=180, fill='plum',outline="plum",tags="nLos") #FFA54F
+            if self.check_nLos() and self.Use_AOA:  # if anyone in nLos, do this
+                self.canvas.create_arc(200-self.Master2SlverDistance/2 - 7.5, 60-self.nLos_radis -7.5, 200+self.Master2SlverDistance/2 + 7.5, 60+self.nLos_radis +7.5, start=180, extent=180, fill='plum',outline="plum",tags="nLos") #FFA54F
                 self.canvas.tag_raise("nLos", "blue")
-                        
+            elif self.check_nLos() and self.Use_AOA == False:  
+                self.canvas.create_arc(400-self.Master2SlverDistance/2 - 7.5, 60-self.nLos_radis -7.5, 400+self.Master2SlverDistance/2 + 7.5, 60+self.nLos_radis +7.5, start=180, extent=180, fill='plum',outline="plum",tags="nLos") #FFA54F
+                self.canvas.tag_raise("nLos", "blue")
             elif self.canvas.find_withtag("nLos"):
                 self.canvas.delete("nLos")
 
         if not self.canvas.find_withtag(tags): 
             self.user_oval[f'user_{idx}_oval'] = self.canvas.create_oval(user[0]-5, user[1]-5, user[0]+5, user[1]+5,outline=self.colors[idx], fill=self.colors[idx],tags=("user" + str(idx)))
             self.user_txt[f'user_{idx}_txt'] = self.canvas.create_text(user[0], user[1]+15, text=f'U{idx} : {speed}cm/s', fill=self.colors[idx],tags=("usertxt" + str(idx)))
+            if self.Use_AOA == True:
+                self.user_oval_aoa[f'user_{idx}_oval_AOA'] = self.canvas.create_oval(user[1]+440-5, 250-self.z-5, user[1]+440+5, 250-self.z+5,outline=self.colors[idx], fill=self.colors[idx],tags=("userAOA" + str(idx)))
+                self.user_txt_aoa[f'user_{idx}_txt_AOA'] = self.canvas.create_text(user[1]+440, 250-self.z+15, text=f"U{idx} height : {self.distance_list[idx]['CoorZ_Arr'][-1]}", fill=self.colors[idx],tags=("usertxtAOA" + str(idx)))
         else:
             self.canvas.itemconfigure(self.user_txt[f'user_{idx}_txt'], text=f'U{idx} : {speed}cm/s')
-            self.move_oval(self.canvas,self.user_oval[f'user_{idx}_oval'], self.user_txt[f'user_{idx}_txt'], self.distance_list[idx]['Start_X'], self.distance_list[idx]['Start_Y'], round(user[0]), round(user[1]))
+            if self.Use_AOA == True:
+                self.canvas.itemconfigure(self.user_txt_aoa[f'user_{idx}_txt_AOA'], text=f"U{idx} height : {self.distance_list[idx]['CoorZ_Arr'][-1]}")
+                self.move_oval(self.canvas,self.user_oval[f'user_{idx}_oval'], self.user_txt[f'user_{idx}_txt'], self.distance_list[idx]['Start_X'], self.distance_list[idx]['Start_Y'], round(user[0]), round(user[1]), \
+                            self.user_oval_aoa[f'user_{idx}_oval_AOA'], self.user_txt_aoa[f'user_{idx}_txt_AOA'], self.distance_list[idx]['Start_X_AOA'], self.distance_list[idx]['Start_Y_AOA'], round(user[1]+440), 250-self.z)
+            else:
+                self.move_oval(self.canvas,self.user_oval[f'user_{idx}_oval'], self.user_txt[f'user_{idx}_txt'], self.distance_list[idx]['Start_X'], self.distance_list[idx]['Start_Y'], round(user[0]), round(user[1]), None, None, None, None, None, None)
         self.distance_list[idx]['Start_X'] = round(user[0])
         self.distance_list[idx]['Start_Y'] = round(user[1])
-    
-    def draw_basic(self):
+        self.distance_list[idx]['Start_X_AOA'] = round(user[1])+440
+        self.distance_list[idx]['Start_Y_AOA'] = 250 - self.z
+
+    def draw_basic(self, idx):
         self.canvas.delete("all")
-        # 绘制闸机(left)  以400为x原点，右下角坐标:[400-self.Master2SlverDistance/2,60]  左上角坐标[(400-self.Master2SlverDistance/2-30),10]
-        # 参数: 左上角x, 左上角y, 右下角x, 右下角y, 线宽, 线条颜色, 填充颜色
-        self.canvas.create_rectangle(400-self.Master2SlverDistance/2-30,10, 400-self.Master2SlverDistance/2, 60, width=1, outline="#6E6E6E", fill="#6E6E6E")
+        # AOA
+        if self.Use_AOA == True:
+            # 绘制闸机(left)  以400为x原点，右下角坐标:[400-self.Master2SlverDistance/2,60]  左上角坐标[(400-self.Master2SlverDistance/2-30),10]
+            # 参数: 左上角x, 左上角y, 右下角x, 右下角y, 线宽, 线条颜色, 填充颜色
+            self.canvas.create_rectangle(200-self.Master2SlverDistance/2-30,10, 200-self.Master2SlverDistance/2, 60, width=1, outline="#6E6E6E", fill="#6E6E6E")
+            self.canvas.create_rectangle(200+self.Master2SlverDistance/2, 10, 200+self.Master2SlverDistance/2+30, 60, width=1, outline="#6E6E6E", fill="#6E6E6E")
 
-        # 绘制闸机(right) 以400为x原点，左上角坐标:[400+self.Master2SlverDistance/2,10]  右下角坐标:[(400+self.Master2SlverDistance/2+30),60]
-        # 参数: 左上角x, 左上角y, 右下角x, 右下角y, 线宽, 线条颜色, 填充颜色
-        self.canvas.create_rectangle(400+self.Master2SlverDistance/2, 10, 400+self.Master2SlverDistance/2+30, 60, width=1, outline="#6E6E6E", fill="#6E6E6E")
+            # 绘制蓝区(矩形)   高度固定150
+            # 左上角坐标[400-self.Master2SlverDistance/2,60] 右下角坐标[400+self.Master2SlverDistance/2,60+150]
+            self.canvas.create_rectangle(200-self.Master2SlverDistance/2, 60, 200+self.Master2SlverDistance/2, 60+self.blue_height, width=1, outline="#4A90E2", fill="#4A90E2",tags=("blue"))
 
-        selected_mode = self.modeCombo.get()
-        if selected_mode == "GATE":
-        # 绘制蓝区(矩形)   高度固定150
-        # 左上角坐标[400-self.Master2SlverDistance/2,60] 右下角坐标[400+self.Master2SlverDistance/2,60+150]
-            self.canvas.create_rectangle(400-self.Master2SlverDistance/2, 60, 400+self.Master2SlverDistance/2, 60+self.blue_height, width=1, outline="#4A90E2", fill="#4A90E2",tags=("blue"))
-
-        # 绘制红区(半圆)  r=self.Master2SlverDistance/2  圆心(400,60)  
-        # 左上角坐标(400-self.Master2SlverDistance/2,60-self.Master2SlverDistance/2)
-        # 右下角坐标(400+self.Master2SlverDistance/2,60+self.Master2SlverDistance/2)
+            # 绘制红区(半圆)  r=self.Master2SlverDistance/2  圆心(400,60)  
+            # 左上角坐标(400-self.Master2SlverDistance/2,60-self.Master2SlverDistance/2)
+            # 右下角坐标(400+self.Master2SlverDistance/2,60+self.Master2SlverDistance/2)
             if self.red_height == 0:
-                self.canvas.create_arc(400-self.Master2SlverDistance/2, 60-self.Master2SlverDistance/2, 400+self.Master2SlverDistance/2, 60+self.Master2SlverDistance/2, \
-                                   start=180, extent=180, fill='#FF6347',outline="#FF6347", tags=("red"))
+                self.canvas.create_arc(200-self.Master2SlverDistance/2, 60-self.Master2SlverDistance/2, 200+self.Master2SlverDistance/2, 60+self.Master2SlverDistance/2, \
+                                start=180, extent=180, fill='#FF6347',outline="#FF6347", tags=("red"))
             else:
-                self.canvas.create_arc(400-self.Master2SlverDistance/2, 60-self.red_height/2, 400+self.Master2SlverDistance/2, 60+self.red_height/2, \
-                                   start=180, extent=180, fill='#FF6347',outline="#FF6347", tags=("red"))
-        #self.canvas.create_text(360,300,text="坐标:")
-        elif selected_mode == 'LIFT':
-            self.canvas.create_rectangle(400-self.Master2SlverDistance/2, 60, 400+self.Master2SlverDistance/2, 60+self.distance_list[0]['lift_deep'], \
-                                         width=1, outline="#4A90E2", fill="#4A90E2")
+                self.canvas.create_arc(200-self.Master2SlverDistance/2, 60-self.red_height/2, 200+self.Master2SlverDistance/2, 60+self.red_height/2, \
+                                start=180, extent=180, fill='#FF6347',outline="#FF6347", tags=("red"))
+            
+            #侧视图 (500,250)为原点
+            self.canvas.create_rectangle(500-30, 225, 500, 250, width=1, outline="#6E6E6E", fill="#6E6E6E")
+            if self.red_height == 0:
+                self.canvas.create_rectangle(530-30, 100, 530-30+self.Master2SlverDistance/2, 250, width=1, outline="#FF6347", fill="#FF6347")
+                self.canvas.create_rectangle(530-30+self.Master2SlverDistance/2, 100, 530-30+self.Master2SlverDistance/2+150, 250, width=1, outline="#4A90E2", fill="#4A90E2")
+            else:
+                self.canvas.create_rectangle(530-30, 100, 530-30+self.red_height/2, 250, width=1, outline="#FF6347", fill="#FF6347")
+                self.canvas.create_rectangle(530-30+self.red_height/2, 100, 530-30+self.red_height/2+150, 250, width=1, outline="#4A90E2", fill="#4A90E2")
+
+        else:  # TWR
+            self.canvas.create_rectangle(400-self.Master2SlverDistance/2-30,10, 400-self.Master2SlverDistance/2, 60, width=1, outline="#6E6E6E", fill="#6E6E6E")
+            self.canvas.create_rectangle(400+self.Master2SlverDistance/2, 10, 400+self.Master2SlverDistance/2+30, 60, width=1, outline="#6E6E6E", fill="#6E6E6E")
+
+            selected_mode = self.modeCombo.get()
+            if selected_mode == "GATE":
+                self.canvas.create_rectangle(400-self.Master2SlverDistance/2, 60, 400+self.Master2SlverDistance/2, 60+self.blue_height, width=1, outline="#4A90E2", fill="#4A90E2",tags=("blue"))
+                if self.red_height == 0:
+                    self.canvas.create_arc(400-self.Master2SlverDistance/2, 60-self.Master2SlverDistance/2, 400+self.Master2SlverDistance/2, 60+self.Master2SlverDistance/2, \
+                                    start=180, extent=180, fill='#FF6347',outline="#FF6347", tags=("red"))
+                else:
+                    self.canvas.create_arc(400-self.Master2SlverDistance/2, 60-self.red_height/2, 400+self.Master2SlverDistance/2, 60+self.red_height/2, \
+                                    start=180, extent=180, fill='#FF6347',outline="#FF6347", tags=("red"))
+            elif selected_mode == 'LIFT':
+                self.canvas.create_rectangle(400-self.Master2SlverDistance/2, 60, 400+self.Master2SlverDistance/2, 60+self.distance_list[0]['lift_deep'], \
+                                            width=1, outline="#4A90E2", fill="#4A90E2")
         self.init_draw = 1
 
     def startULTDOA(self):
@@ -730,7 +810,7 @@ class SerialAssistant:
         self.update_location()
         pass
 
-    def on_mode_change(self,event=None):
+    def on_mode_change(self,idx,event=None):
         selected_mode = self.modeCombo.get()
         if selected_mode == "UL-TDOA":
 
@@ -741,7 +821,7 @@ class SerialAssistant:
             pass
         
         else:
-            self.draw_basic();      
+            self.draw_basic(idx);      
 
     def update_location(self):
         # try:

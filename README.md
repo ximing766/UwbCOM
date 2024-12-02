@@ -39,11 +39,15 @@ pyinstaller UwbCOM.spec
 
 UWB的串口GUI工具，显示用户位置。
 
-- 目前支持TWR的GATE和LIFT两种方案下定位
+- 支持显示多用户(最多同时支持20个用户显示)
 
-- 提供了UL-TDOA的demo(待连接硬件验证)
+- 支持TWR定位方案
 
-- 提供了LIFT方案的演示
+- 支持AOA定位方案
+
+- 支持UL-TDOA定位方案(待连接硬件验证)
+
+- 支持不同类型场景的定位方案切换
 
   
 
@@ -74,5 +78,5 @@ pip install -r requirements.txt
 
 # 下载
 
-[https://github.com/ximing766/UwbCOM/releases/tag/v1.0]: 
+[https://github.com/ximing766/UwbCOM/releases/tag/v1.3]: 
 
