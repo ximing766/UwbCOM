@@ -4,20 +4,49 @@ import serial
 import serial.tools.list_ports
 import threading
 import ttkbootstrap as ttk
+import customtkinter
+import ctypes
 import time
 
 class SerialAssistant:
     def __init__(self, master):
         self.master = master
         self.master.title("Reader")
+        self.master.minsize(650, 600)
+        self.master.geometry("650x600")
+        self.my_lib = ctypes.WinDLL("./tools/libRSCode.dll")
+        self.my_lib.initialize_ecc()
+        self.my_lib.encode_data.argtypes = [ctypes.POINTER(ctypes.c_ubyte), ctypes.c_int, ctypes.POINTER(ctypes.c_ubyte)]
+        self.my_lib.encode_data.restype = None
 
         self.serial = None
         self.is_running = False
-        self.read_data_res = "0000FFA70005FFFFFFFFFF06FFFFFFFFFF28C20211805003020B01000000010409000100010F8580DC12D08027127D010100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000001901023B7227000000000000000000000000000000000000000000001700"
-        self.write_data_res = "0000FF250005FFFFFFFFFF06FFFFFFFFFF2AC20115805401000F0000000120240821185844B2568CE5087600"
-        self.halt_data_res =  "0000FF100005FFFFFFFFFF06FFFFFFFFFF44CA0000F100"
-        self.flag = 0
+        
+        # self.read_data_res = "0000FFA70005FFFFFFFFFF06FFFFFFFFFF28C20211805003020B01000000010409000100010F8580DC12D08027127D010100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000001901023B7227000000000000000000000000000000000000000000001700778AB54891E0D22DF4AE"                      
+        # self.write_data_res = "0000FF250005FFFFFFFFFF06FFFFFFFFFF2AC20115805401000F0000000120240821185844B2568CE5087600FFF6DBA8F9B8CBEBB13A"
+        # self.halt_data_res =  "0000FF100005FFFFFFFFFF06FFFFFFFFFF44CA0000F100F5D4543F960BEFB499F1"
 
+        self.read_data_res = bytes([0x00,0x00,0xFF,0xA7,0x00,0x05,0xFF,0xFF,0xFF,0xFF,0xFF,0x06,0xFF,0xFF,0xFF,0xFF,0xFF,0x28,0xC2,0x02,0x11,0x80,0x50,0x03,0x02,0x0B,
+                                    0x01,0x00,0x00,0x00,0x01,0x04,0x09,0x00,0x01,0x00,0x01,0x0F,0x85,0x80,0xDC,0x12,0xD0,0x80,0x27,0x12,0x7D,0x01,0x01,0x00,0x00,0x00,
+                                    0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
+                                    0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
+                                    0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
+                                    0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x19,0x01,0x02,0x3B,0x72,0x27,0x00,0x00,0x00,0x00,0x00,0x00,
+                                    0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x17,0x00])
+        self.write_data_res = bytes([0x00,0x00,0xFF,0x25,0x00,0x05,0xFF,0xFF,0xFF,0xFF,0xFF,0x06,0xFF,0xFF,0xFF,0xFF,0xFF,0x2A,0xC2,0x01,0x15,0x80,0x54,0x01,0x00,0x0F,
+                                     0x00,0x00,0x00,0x01,0x20,0x24,0x08,0x21,0x18,0x58,0x44,0xB2,0x56,0x8C,0xE5,0x08,0x76,0x00])
+        self.halt_data_res =  bytes([0x00, 0x00, 0xFF, 0x10, 0x00, 0x05, 0xFF, 0xFF, 0xFF, 0xFF,0xFF, 0x06, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0x44, 0xCA, 0x00, 0x00, 0xF1, 0x00])
+        self.read_data_res = self.RS_Encode(self.read_data_res)
+        self.write_data_res = self.RS_Encode(self.write_data_res)
+        self.halt_data_res = self.RS_Encode(self.halt_data_res)
+
+        old_part = self.read_data_res[-29:-23]
+        new_part = "010203"
+        self.read_data_res = self.read_data_res[:-29] + new_part + self.read_data_res[-23:]
+        print(f'read_data_res: {self.read_data_res}')
+
+
+        self.flag = 0
         self.sequence = "06FFFFFFFFFF05FFFFFFFFFF"
 
         # GUI 设置
@@ -27,14 +56,11 @@ class SerialAssistant:
         master.grid_columnconfigure(3, weight=1)
         master.grid_columnconfigure(4, weight=1)
         master.grid_columnconfigure(5, weight=1)
-        self.text_area = scrolledtext.ScrolledText(master, width=100, height=40)
+        self.text_area = customtkinter.CTkTextbox(master, width=400, height=450,  fg_color=("#A0C8CF"))
         self.text_area.grid(column=0, row=0, columnspan=6, padx=10, pady=10,sticky='nsew')
 
-        self.port_label = ttk.Label(master, text="选择串口:",bootstyle="primary")
+        self.port_label = customtkinter.CTkLabel(master, text="COM Settings:", corner_radius = 10, fg_color= ("#A0C8CF"), font=("Roboto", 15))
         self.port_label.grid(column=0, row=1, padx=10, pady=10,sticky='nsew')
-
-        self.baudrate_label = ttk.Label(master, text="波特率:",bootstyle="primary")
-        self.baudrate_label.grid(column=2, row=1, padx=10, pady=10,sticky='nsew')
 
         self.port_options = self.get_serial_ports()
         self.port_var = tk.StringVar(master)
@@ -42,34 +68,44 @@ class SerialAssistant:
             self.port_var.set(self.port_options[0])  # 默认选择第一个串口
         else:
             self.port_var.set('')  # 如果没有串口，设置为空字符串
-        self.port_menu = ttk.OptionMenu(master, self.port_var, *self.port_options,bootstyle="primary")
+        self.port_menu = customtkinter.CTkOptionMenu(master, variable=self.port_var, values=[*self.port_options], font=("Roboto", 15))
         self.port_menu.grid(column=1, row=1, padx=10, pady=10,sticky='nsew')
 
         self.baudrate_var = tk.IntVar(master, 460800)  # 默认波特率9600
-        self.baudrate_menu = ttk.OptionMenu(master, self.baudrate_var, 460800,115200, 3000000, 9600,bootstyle="primary")
-        self.baudrate_menu.grid(column=3, row=1, padx=10, pady=10,sticky='nsew')
+        self.baudrate_menu = customtkinter.CTkOptionMenu(master, variable=self.baudrate_var, values = ["460800", "115200", "3000000", "9600"], font=("Roboto", 15))
+        self.baudrate_menu.grid(column=2, row=1, padx=10, pady=10,sticky='nsew')
 
-        self.connect_button = ttk.Button(master, text="连接", command=self.connect,bootstyle="primary")
-        self.connect_button.grid(column=4, row=1, padx=10, pady=10,sticky='nsew')
+        self.segemented_button = customtkinter.CTkSegmentedButton(master, values=["Connect", "Disconnect"], command=self.segmented_button_callback, font=("Roboto", 15), width=280)
+        self.segemented_button.grid(column=3, columnspan=2, row=1, padx=10, pady=10,sticky='nsew')
+        self.segemented_button.set("Disconnect")
 
-        self.disconnect_button = ttk.Button(master, text="断开连接", command=self.disconnect,bootstyle="primary")
-        self.disconnect_button.grid(column=5, row=1, padx=10, pady=10,sticky='nsew')
-
-        self.disconnect_button.config(state=tk.DISABLED)
-
-        self.send_button = ttk.Button(master, text="发送数据", command=self.send_data,bootstyle="primary")
+        self.send_button = customtkinter.CTkButton(master, text="Send", command=self.send_data, font=("Roboto", 15))
         self.send_button.grid(column=0, row=2, padx=10, pady=10,sticky='nsew')
 
-        self.data_entry = ttk.Entry(master,bootstyle="primary")
-        self.data_entry.grid(column=1, row=2, columnspan=4, padx=10, pady=10,sticky='nsew')
+        self.data_entry = customtkinter.CTkEntry(master,placeholder_text="Please input data...", font=("Roboto", 15))
+        self.data_entry.grid(column=1, row=2, columnspan=3, padx=10, pady=10,sticky='nsew')
 
-        self.clear_button = ttk.Button(master, text="清除", command=self.clear_text_area, bootstyle="primary")
-        self.clear_button.grid(column=5, row=2, padx=10, pady=10, sticky='nsew')
+        self.clear_button = customtkinter.CTkButton(master, text="Clear", command=self.clear_text_area, font=("Roboto", 15))
+        self.clear_button.grid(column=4, row=2, padx=10, pady=10, sticky='nsew')
 
         # self.update_senddata()
     
+    def RS_Encode(self, data):
+        codeword = (ctypes.c_ubyte * (len(data) + 10))()
+        self.my_lib.encode_data((ctypes.c_ubyte * len(data)).from_buffer_copy(data), len(data), codeword)
+        # result = bytes(codeword)
+        hex_string = ''.join(f'{byte:02x}' for byte in bytes(codeword))
+        print("Encoded data:", hex_string)
+        return hex_string
+    
     def clear_text_area(self):
         self.text_area.delete(1.0, tk.END)  # 清除文本框内容
+    
+    def segmented_button_callback(self, value):
+        if value == "Connect":
+            self.connect()
+        elif value == "Disconnect":
+            self.disconnect()
 
     def update_senddata(self):
         self.send_data(self.halt_data_res)
@@ -90,9 +126,10 @@ class SerialAssistant:
             if self.port_var.get():
                 self.serial = serial.Serial(self.port_var.get(), self.baudrate_var.get(), timeout=0.05)   # reader 50ms返回
                 self.is_running = True
-                self.connect_button.config(state=tk.DISABLED)
-                self.disconnect_button.config(state=tk.ACTIVE)
+                # self.connect_button.configure(state=tk.DISABLED)
+                # self.disconnect_button.configure(state=tk.ACTIVE)
                 self.start_read()
+                self.show_in_text_area(f"串口已打开: {self.port_var.get()} {self.baudrate_var.get()}")
             else:
                 self.show_in_text_area("请选择一个串口")
         except Exception as e:
@@ -102,8 +139,9 @@ class SerialAssistant:
         if self.serial:
             self.serial.close()
         self.is_running = False
-        self.connect_button.config(state=tk.NORMAL)
-        self.disconnect_button.config(state=tk.DISABLED)
+        self.show_in_text_area(f"串口已关闭")
+        # self.connect_button.configure(state=tk.NORMAL)
+        # self.disconnect_button.configure(state=tk.DISABLED)
 
     def start_read(self):
         if self.is_running:
@@ -141,7 +179,7 @@ class SerialAssistant:
         else:
             print("Sequence not found")
     def read_data(self):
-        while self.is_running:
+        while self.is_running and self.serial:
             try:
                 if data := self.serial.readline():
                     self.current_time = time.time()
@@ -179,6 +217,8 @@ class SerialAssistant:
         self.text_area.insert(tk.END, message + "\n" + "\n")
         self.text_area.see(tk.END)
 
-root = tk.Tk()
+customtkinter.set_appearance_mode("light")  # Modes: System (default), light, dark
+customtkinter.set_default_color_theme("blue")  # Themes: "blue" (standard), "green", "dark-blue"
+root = customtkinter.CTk()
 app = SerialAssistant(root)
 root.mainloop()
