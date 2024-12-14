@@ -15,12 +15,14 @@ from collections import deque
 import time
 import warnings
 import json
+import csv
 import os
 import configparser
 from sklearn.linear_model import LinearRegression
 from sklearn.preprocessing import PolynomialFeatures
 from sklearn.linear_model import ElasticNet
 import numpy as np
+from Plot.UwbParameterPlot import MultiPlotter
 from Algorithm.lift_uwb_dynamic_detect_plan import UWBLiftAnimationPlan1,UWBLiftAnimationPlan2
 from Algorithm.KF_classify import KalmanFilter
 from Algorithm.location.ultdoa_dynamic_location import CoordinatePlotter
@@ -38,8 +40,8 @@ class SerialAssistant:
         # test
 
         self.master.title("UwbCOM V1.3")
-        self.master.minsize(800, 839)
-        self.master.geometry("850x820")
+        self.master.minsize(900, 835)
+        self.master.geometry("900x835")
         icon_path = os.path.join(os.path.dirname(__file__), 'UWBCOM.ico')
         self.master.wm_iconbitmap(icon_path)
 
@@ -130,6 +132,9 @@ class SerialAssistant:
         self.Use_AOA              = False   
 
         self.CallCount            = 0
+        self.table_data           = []
+        self.table_one_data       = 0
+        self.table_IDX            = 0
         self.current_time         = 0
         self.last_call_time       = 0
         self.max_moves            = 15
@@ -172,45 +177,47 @@ class SerialAssistant:
         frame_settings.grid_columnconfigure(3, weight=1)
         frame_settings.grid_columnconfigure(4, weight=1)
         frame_settings.grid_columnconfigure(5, weight=1)
+        frame_settings.grid_rowconfigure(0, weight=1)
+        frame_settings.grid_rowconfigure(1, weight=1)
 
-        ttk.Label(frame_settings, text="COM" + Emoji._ITEMS[-106:][7].char,bootstyle="warning").grid(row=0, column=0, padx=1, pady=5,sticky='w')
+        ttk.Label(frame_settings, text="COM" + Emoji._ITEMS[-106:][7].char,bootstyle="warning").grid(row=0, column=0, padx=1, pady=5,sticky='nsew')
         self.port_var = tk.StringVar()
 
         self.combo = ttk.Combobox(frame_settings, values=self.get_serial_ports(),bootstyle="info")
         self.update_combobox()
-        self.combo.grid(row=0, column=1, padx=1, pady=5,sticky='we')
+        self.combo.grid(row=0, column=1, padx=1, pady=5,sticky='nsew')
 
-        ttk.Label(frame_settings, text="Baud" + Emoji._ITEMS[-106:][-4].char,bootstyle="warning").grid(row=1, column=0, padx=1, pady=5,sticky='w')
+        ttk.Label(frame_settings, text="Baud" + Emoji._ITEMS[-106:][-4].char,bootstyle="warning").grid(row=1, column=0, padx=1, pady=5,sticky='nsew')
         self.baudrate_var = tk.IntVar()
         
         self.baudCombo = ttk.Combobox(frame_settings,values=['3000000','115200','9600'],bootstyle="info")
         self.baudCombo.current(0)
-        self.baudCombo.grid(row=1, column=1, padx=1, pady=5,sticky='we')
+        self.baudCombo.grid(row=1, column=1, padx=1, pady=5,sticky='nsew')
 
         button_width = 8
         entry_width  = 20
 
         self.serial_bt = ttk.Button(frame_settings, text="打开串口", command=self.open_serial, width=button_width,bootstyle="info")
-        self.serial_bt.grid(row=0, column=2, padx=5, pady=5,sticky='ns')
+        self.serial_bt.grid(row=0, column=2, padx=5, pady=5,sticky='nsew')
 
         self.modeCombo = ttk.Combobox(frame_settings,values=['GATE','LIFT','UL-TDOA','DL-TDOA'],width=button_width,bootstyle="info")
         self.modeCombo.current(0)
-        self.modeCombo.grid(row=1, column=2, padx=5, pady=5,sticky='ns')
+        self.modeCombo.grid(row=1, column=2, padx=5, pady=5,sticky='nsew')
         self.modeCombo.bind("<<ComboboxSelected>>", self.on_mode_change)
 
-        card_Button     = ttk.Button(frame_settings, text="卡  号", command=lambda:self.send_data(11111), width=button_width,bootstyle="primary").grid(row=0, column=4, padx=5, pady=5,sticky='ns')   #这块数据下行
+        card_Button     = ttk.Button(frame_settings, text="卡  号", command=lambda:self.send_data(11111), width=button_width,bootstyle="primary").grid(row=0, column=4, padx=5, pady=5,sticky='nsew')   #这块数据下行
         self.text_area1 = ttk.Entry(frame_settings,width=entry_width,bootstyle="info")
         self.text_area1.grid(row=0, column=3, padx=5, pady=5, sticky='nsew')
         
-        other_Button    = ttk.Button(frame_settings, text="有效期", command=lambda:self.send_data(22222), width=button_width,bootstyle="primary").grid(row=1, column=4, padx=5, pady=5,sticky='ns')
+        other_Button    = ttk.Button(frame_settings, text="有效期", command=lambda:self.send_data(22222), width=button_width,bootstyle="primary").grid(row=1, column=4, padx=5, pady=5,sticky='nsew')
         self.text_area2 = ttk.Entry(frame_settings,width=entry_width,bootstyle="info")
         self.text_area2.grid(row=1, column=3, padx=5, pady=5, sticky='nsew') 
         
-        other_Button1   = ttk.Button(frame_settings, text="余  额", command=lambda:self.send_data(33333), width=button_width,bootstyle="primary").grid(row=0, column=6, padx=5, pady=5,sticky='ns')
+        other_Button1   = ttk.Button(frame_settings, text="余  额", command=lambda:self.send_data(33333), width=button_width,bootstyle="primary").grid(row=0, column=6, padx=5, pady=5,sticky='nsew')
         self.text_area3 = ttk.Entry(frame_settings,width=entry_width,bootstyle="info")
         self.text_area3.grid(row=0, column=5, padx=5, pady=5, sticky='nsew') 
         
-        other_Button2   = ttk.Button(frame_settings, text="交易记录", command=lambda:self.send_data(44444), width=button_width,bootstyle="primary").grid(row=1, column=6, padx=5, pady=5,sticky='ns')
+        other_Button2   = ttk.Button(frame_settings, text="交易记录", command=lambda:self.send_data(44444), width=button_width,bootstyle="primary").grid(row=1, column=6, padx=5, pady=5,sticky='nsew')
         self.text_area4 = ttk.Entry(frame_settings,width=entry_width,bootstyle="info")
         self.text_area4.grid(row=1, column=5, padx=5, pady=5, sticky='nsew')
         
@@ -218,74 +225,87 @@ class SerialAssistant:
         description: 通信区域
         '''        
         # 通信区总框架
-        frame_comm = ttk.LabelFrame(self.master, text="通信区",width = 100 ,height=10,bootstyle="info")
+        frame_comm = ttk.LabelFrame(self.master, text="通信区",width = 900 ,height=250,bootstyle="info")
         frame_comm.grid(row=1, column=0, padx=5, pady=5,sticky='nsew')
         frame_comm.grid_columnconfigure(0, weight=1)
         frame_comm.grid_columnconfigure(1, weight=1)
         frame_comm.grid_rowconfigure(0, weight=1)
-        #frame_comm.grid_propagate(False)  # 防止父容器根据子控件的大小自动调整自身大小
+        frame_comm.grid_propagate(False)  # 防止父容器根据子控件的大小自动调整自身大小
         
-        # 总框架左侧单独一个文本框
-        self.text_box = ttk.ScrolledText(frame_comm, width=60, height=10)
-        self.text_box.grid(row=0, column=0, padx=1, pady=1,sticky='nsew')
+        # 总框架左侧单独一个表格
+
+        frame_comm_L = ttk.Frame(frame_comm,height=10,width=600)        
+        frame_comm_L.grid(row=0, column=0, padx=1, pady=1,sticky='nsew')
+        frame_comm_L.grid_rowconfigure(0,weight=1)
+        frame_comm_L.grid_columnconfigure(0, weight=1)
+        table_columns = ('ID','User','nLos','D-Master','D-Slaver','D-Gate','Speed','x','y','z')
+        self.Table = ttk.Treeview(frame_comm_L, columns=table_columns,show='headings',bootstyle="info")
+        for col in table_columns:
+            self.Table.heading(col, text=col, anchor='w')
+        self.SetTableColumns()
+        self.Table.grid(row=0, column=0, padx=1, pady=1,sticky='nsew')
         
-         #右侧总宽度
-        frame_comm_sub_width = 40
         # 总框架右侧子总框
-        frame_comm_sub = ttk.Frame(frame_comm, width=frame_comm_sub_width,height=10)        
-        frame_comm_sub.grid(row=0, column=1, padx=1, pady=1,sticky='nsew')
-        frame_comm_sub.grid_rowconfigure(0,weight=1)
-        frame_comm_sub.grid_rowconfigure(1,weight=1)
-        frame_comm_sub.grid_columnconfigure(0, weight=1)
+        frame_comm_R = ttk.Frame(frame_comm,height=10,width=300)        
+        frame_comm_R.grid(row=0, column=1, padx=1, pady=1,sticky='nsew')
+        frame_comm_R.grid_rowconfigure(0,weight=1)
+        frame_comm_R.grid_rowconfigure(1,weight=1)
+        frame_comm_R.grid_columnconfigure(0, weight=1)
 
         # 子总框上侧功能框
-        frame_sub_func_height = 5
-        frame_sub_func        = ttk.Frame(frame_comm_sub, width=frame_comm_sub_width,height=frame_sub_func_height,bootstyle="info")
-        frame_sub_func.grid(row=0, column=0, padx=1, pady=1,sticky='nsew')
-        frame_sub_func.grid_rowconfigure(0,weight=1)
-        frame_sub_func.grid_columnconfigure(0, weight=1)   
-
-        # 创建第二个文本框并放置在同一行
-        self.text_box2 = scrolledtext.ScrolledText(frame_sub_func, width=45,height=frame_sub_func_height)
-        self.text_box2.grid(row=0, column=0, padx=1, pady=1,sticky='nsew')
+        frame_comm_R_Top_height = 5
+        frame_comm_R_Top        = ttk.Frame(frame_comm_R,width=300,height=frame_comm_R_Top_height)
+        frame_comm_R_Top.grid(row=0, column=0, padx=1, pady=1,sticky='nsew')
+        frame_comm_R_Top.grid_rowconfigure(0,weight=1)
+        frame_comm_R_Top.grid_columnconfigure(0, weight=1)   
         
-        frame_bt_width = 5
+        frame_comm_R_Top_bt_width = 5
         # 基础功能框架
-        frame_bt = ttk.Frame(frame_sub_func, width=frame_bt_width,height=frame_sub_func_height,bootstyle="info")
-        frame_bt.grid(row=0, column=1, padx=1, pady=1,sticky='nsew')
-        frame_bt.grid_rowconfigure(0,weight=1)
-        frame_bt.grid_rowconfigure(1,weight=1)
-        frame_bt.grid_rowconfigure(2,weight=1)
-        frame_bt.grid_columnconfigure(0, weight=1)
+        # frame_comm_R_Top_bt = ttk.Frame(frame_comm_R_Top, width=frame_comm_R_Top_bt_width,height=frame_comm_R_Top_height,bootstyle="info")
+        # frame_comm_R_Top_bt.grid(row=0, column=1, padx=1, pady=1,sticky='nsew')
+        # frame_comm_R_Top_bt.grid_rowconfigure(0,weight=1)
+        # frame_comm_R_Top_bt.grid_rowconfigure(1,weight=1)
+        # frame_comm_R_Top_bt.grid_rowconfigure(2,weight=1)
+        # frame_comm_R_Top_bt.grid_columnconfigure(0, weight=1)
 
-        # 创建并放置清除第一个文本框内容的按钮
-        clear_button = ttk.Button(frame_bt, text="清除", command=lambda:self.clearAndSave_text(1),width=frame_bt_width,bootstyle="info")
-        clear_button.grid(row=0, column=0, padx=1, pady=1,sticky='nsew')
+        clear_bt = ttk.Button(frame_comm_R_Top, text="清除", command=lambda:self.on_clearAndSave_text(1),width=frame_comm_R_Top_bt_width,bootstyle="success-outline-toolbutton")
+        clear_bt.grid(row=0, column=0, padx=1, pady=3,sticky='ew')
         
-        # 创建并放置清除第一个文本框内容的按钮
-        clear_button3 = ttk.Button(frame_bt, text="保存1", command=lambda:self.clearAndSave_text(3),width=frame_bt_width,bootstyle="info")
-        clear_button3.grid(row=1, column=0, padx=1, pady=1,sticky='nsew')
+        save_bt = ttk.Button(frame_comm_R_Top, text="保存", command=lambda:self.on_clearAndSave_text(2),width=frame_comm_R_Top_bt_width,bootstyle="success-outline-toolbutton")
+        save_bt.grid(row=1, column=0, padx=1, pady=3,sticky='ew')
 
-        # 创建并放置清除第二个文本框内容的按钮
-        clear_button4 = ttk.Button(frame_bt, text="保存2", command=lambda:self.clearAndSave_text(4),width=frame_bt_width,bootstyle="info")
-        clear_button4.grid(row=2, column=0, padx=1, pady=1,sticky='nsew')
+        self.check_var1 = tk.IntVar()
+        Check_bt1 = ttk.Checkbutton(frame_comm_R_Top, text="Distance", command=lambda:self.on_checkbutton_click(), variable=self.check_var1, bootstyle="success-toolbutton")
+        Check_bt1.grid(row=0, column=1, padx=1, pady=3,sticky='ew')
+
+        self.check_var2 = tk.IntVar()
+        Check_bt2 = ttk.Checkbutton(frame_comm_R_Top, text="Speed", command=lambda:self.on_checkbutton_click(), variable=self.check_var2, bootstyle="success-toolbutton")
+        Check_bt2.grid(row=1, column=1, padx=1, pady=3,sticky='ew')
+
+        self.check_var3 = tk.IntVar()
+        Check_bt3 = ttk.Checkbutton(frame_comm_R_Top, text="XYZ", command=lambda:self.on_checkbutton_click(), variable=self.check_var3, bootstyle="success-toolbutton")
+        Check_bt3.grid(row=0, column=2, padx=1, pady=3,sticky='ew')
+
+        self.check_var4 = tk.IntVar()
+        Check_bt4 = ttk.Checkbutton(frame_comm_R_Top, text="显示EED", command=lambda:self.on_checkbutton_click(), variable=self.check_var4, bootstyle="success-toolbutton")
+        Check_bt4.grid(row=1, column=2, padx=1, pady=3,sticky='ew')
 
         # 子总框下侧功能框(更具进度条的值，更新演示图中电梯的高度和深度,半径)
-        frame_sub_lift = ttk.LabelFrame(frame_comm_sub, width=frame_comm_sub_width, height=15,text="Elevator scheme demonstration",bootstyle="info")
-        frame_sub_lift.grid(row=1, column=0, padx=1, pady=1,sticky='nsew')
-        frame_sub_lift.grid_rowconfigure(0,weight=1)
-        frame_sub_lift.grid_rowconfigure(1,weight=1)
-        frame_sub_lift.grid_rowconfigure(2,weight=1)
-        frame_sub_lift.grid_columnconfigure(1, weight=1)
+        frame_comm_R_Bottom = ttk.LabelFrame(frame_comm_R, width=300, height=15,text="Elevator scheme demonstration",bootstyle="info")
+        frame_comm_R_Bottom.grid(row=1, column=0, padx=1, pady=1,sticky='nsew')
+        frame_comm_R_Bottom.grid_rowconfigure(0,weight=1)
+        frame_comm_R_Bottom.grid_rowconfigure(1,weight=1)
+        frame_comm_R_Bottom.grid_rowconfigure(2,weight=1)
+        frame_comm_R_Bottom.grid_columnconfigure(1, weight=1)
 
         # 添加第一个进度条
-        progressbar1 = ttk.Scale(frame_sub_lift, orient="horizontal", length=100, from_=0, to=10,bootstyle="info")
+        progressbar1 = ttk.Scale(frame_comm_R_Bottom, orient="horizontal", length=100, from_=0, to=10,bootstyle="info")
         progressbar1.grid(row=0, column=1, padx=1, pady=1, sticky='nsew')
         progressbar1.set(2.0)
 
         # 添加一个标签来显示第一个进度条的值
         progressbar1_value = tk.StringVar(value=f"LIFT_D : {progressbar1.get():.1f}")
-        progressbar1_label = ttk.Label(frame_sub_lift, textvariable=progressbar1_value)
+        progressbar1_label = ttk.Label(frame_comm_R_Bottom, textvariable=progressbar1_value)
         progressbar1_label.grid(row=0, column=0, padx=1, pady=1, sticky='nsew')
 
         # 赋值给self.lift_deep
@@ -298,13 +318,13 @@ class SerialAssistant:
         progressbar1.bind("<ButtonRelease-1>", update_progressbar1_value)
 
         # 添加第二个进度条
-        progressbar2 = ttk.Scale(frame_sub_lift, orient="horizontal", length=100, from_=0, to=10,bootstyle="warning")
+        progressbar2 = ttk.Scale(frame_comm_R_Bottom, orient="horizontal", length=100, from_=0, to=10,bootstyle="warning")
         progressbar2.grid(row=1, column=1, padx=1, pady=1, sticky='nsew')
         progressbar2.set(3.0)
 
         # 赋值给self.lift_height
         progressbar2_value = tk.StringVar(value=f"LIFT_H : {progressbar2.get():.1f}")
-        progressbar2_label = ttk.Label(frame_sub_lift, textvariable=progressbar2_value)
+        progressbar2_label = ttk.Label(frame_comm_R_Bottom, textvariable=progressbar2_value)
         progressbar2_label.grid(row=1, column=0, padx=1, pady=1, sticky='nsew')
 
         # 更新第二个进度条标签的值
@@ -317,13 +337,13 @@ class SerialAssistant:
         progressbar2.bind("<ButtonRelease-1>", update_progressbar2_value)
 
         # 添加第三个进度条
-        progressbar3 = ttk.Scale(frame_sub_lift, orient="horizontal", length=100, from_=0, to=10)
+        progressbar3 = ttk.Scale(frame_comm_R_Bottom, orient="horizontal", length=100, from_=0, to=10)
         progressbar3.grid(row=2, column=1, padx=1, pady=1, sticky='nsew')
         progressbar3.set(2.0)
 
         # 添加一个标签来显示第三个进度条的值
         self.progressbar3_value = tk.StringVar(value=f"UWB_R : {progressbar3.get():.1f}")
-        progressbar3_label      = ttk.Label(frame_sub_lift, textvariable=self.progressbar3_value)
+        progressbar3_label      = ttk.Label(frame_comm_R_Bottom, textvariable=self.progressbar3_value)
         progressbar3_label.grid(row=2, column=0, padx=1, pady=1, sticky='nsew')
 
         # 更新第三个进度条标签的值
@@ -335,13 +355,13 @@ class SerialAssistant:
         progressbar3.bind("<Motion>", update_progressbar3_value)
         progressbar3.bind("<ButtonRelease-1>", update_progressbar3_value)
 
-        animation_button1 = ttk.Button(frame_sub_lift, text="演示 1", command=self.run_UWB_Lift_Animation_plan_1, width=5,bootstyle="info")
+        animation_button1 = ttk.Button(frame_comm_R_Bottom, text="演示 1", command=self.run_UWB_Lift_Animation_plan_1, width=5,bootstyle="info")
         animation_button1.grid(row=0, column=2, padx=1, pady=0,sticky='nsew')
         
-        animation_button2 = ttk.Button(frame_sub_lift, text="演示 2", command=self.run_UWB_Lift_Animation_plan_2, width=5,bootstyle="info")
+        animation_button2 = ttk.Button(frame_comm_R_Bottom, text="演示 2", command=self.run_UWB_Lift_Animation_plan_2, width=5,bootstyle="info")
         animation_button2.grid(row=1, column=2, padx=1, pady=1,sticky='nsew')
 
-        animation_button2 = ttk.Button(frame_sub_lift, text="占 位", command=self.run_UWB_Lift_Animation_plan_2, width=5,bootstyle="info")
+        animation_button2 = ttk.Button(frame_comm_R_Bottom, text="占 位", command=self.run_UWB_Lift_Animation_plan_2, width=5,bootstyle="info")
         animation_button2.grid(row=2, column=2, padx=1, pady=1,sticky='nsew')
 
         '''
@@ -362,7 +382,7 @@ class SerialAssistant:
         self.notebook.add(self.other_frame, text = 'others')
         self.other_frame.grid_columnconfigure(0, weight=1)
 
-        self.canvas = tk.Canvas(self.canvas_frame,bg="white",height=400)
+        self.canvas = tk.Canvas(self.canvas_frame,bg="white",height=390)
         self.canvas.grid(row=0, column=0, padx=5, pady=5,sticky='nsew')
 
         #绘制画布边界
@@ -372,6 +392,26 @@ class SerialAssistant:
         '''
         others
         '''
+    def table_scroll(self):
+        children = self.Table.get_children()
+        if children:
+            self.Table.yview_moveto(1.0)
+    def insert_data(self, data):
+        self.Table.insert('','end',values=data)
+        self.table_scroll()
+    
+    def SetTableColumns(self):
+        self.Table.column('ID',width=50, anchor='w')
+        self.Table.column('User',width=35, anchor='w')
+        self.Table.column('nLos',width=50, anchor='w')
+        self.Table.column('D-Master',width=65, anchor='w')
+        self.Table.column('D-Slaver',width=65, anchor='w')
+        self.Table.column('D-Gate',width=65, anchor='w')
+        self.Table.column('Speed',width=50, anchor='w')
+        self.Table.column('x',width=50, anchor='w')
+        self.Table.column('y',width=50, anchor='w')
+        self.Table.column('z',width=50, anchor='w')
+        
 
     def update_serial_button(self):
         if self.serial_open:
@@ -382,40 +422,64 @@ class SerialAssistant:
     def close_serial(self):
         if self.serial: 
             self.serial.close()
-            self.text_box.insert(tk.END, "串口已关闭\n")
+            # self.text_box.insert(tk.END, "串口已关闭\n")
 
             self.canvas.delete("all")       
             self.Master2SlverDistance = 0   
             self.serial_open          = False
             self.update_serial_button()
-                                                 
-    def clearAndSave_text(self,flag):
+
+    def clear_table(self):
+        items = self.Table.get_children()
+        for item in items[::-1]:
+            self.Table.delete(item)
+
+    def get_table_data(self):
+        self.table_data = []
+        for item in self.Table.get_children():
+            row_data = self.Table.item(item)['values']
+            self.table_data.append(row_data)
+
+    def on_clearAndSave_text(self,flag):
         if flag == 1:
-            self.text_box.delete(1.0, tk.END)
-            self.text_box2.delete(1.0,tk.END)
+            self.clear_table()
             self.text_area1.delete(0,tk.END)
             self.text_area2.delete(0,tk.END)
             self.text_area3.delete(0,tk.END)
             self.text_area4.delete(0,tk.END)
-        elif flag == 3:
-            content = self.text_box.get("1.0",tk.END)
-            filename = "E:/Distance_content.txt"
+        elif flag == 2:
             try:
-                with open(filename,"w" ,encoding="utf-8") as file:
-                    file.write(content)
-                messagebox.showinfo("tips","save file to root dir success!")
+                columns = self.Table["columns"]
+                column_names = [self.Table.heading(column)['text'] for column in columns]
+                with open("./UWB_Data.csv",'w',newline='') as myfile:
+                    csvwriter = csv.writer(myfile, delimiter=',')
+                    csvwriter.writerow(column_names)
+                    for row_id in self.Table.get_children():
+                        row = self.Table.item(row_id)['values']
+                        csvwriter.writerow(row)
+                messagebox.showinfo("tips","save file success!")
             except Exception as e:
-                messagebox.showerror("tips","save file to root dir failed!")
-                
-        elif flag == 4:
-            content  = self.text_box2.get(1.0,tk.END)
-            filename = "E:/Corr_content.csv"
-            try:
-                with open(filename,"w",encoding="utf-8") as file:
-                    file.write(content)
-                messagebox.showinfo("tips","save file to root dir success!")
-            except Exception as e:
-                messagebox.showerror("tips","save file to root dir failed!")
+                messagebox.showerror("tips","save file failed:{e}")    
+    
+    def on_checkbutton_click(self):
+        self.get_table_data()
+        plotter = MultiPlotter(self.table_data)
+        if self.check_var1.get() == 1:
+            plotter.plot_distance()
+        else:
+            plotter.close_plt(plotter.distance_fig)
+        
+        if self.check_var2.get() == 1:
+            plotter.plot_speed()
+        else:
+            plotter.close_plt(plotter.speed_fig)
+
+        if self.check_var3.get() == 1:
+            plotter.plot_xyz()
+        else:
+            plotter.close_plt(plotter.xyz_fig)
+        # else:
+        #     messagebox.showerror("tips","please select the plot type!")
     
     def send_data(self,flag):
         self.flag_str = str(flag)
@@ -479,7 +543,7 @@ class SerialAssistant:
             self.update_serial_button()
 
         except Exception as e:
-            self.text_box.insert(tk.END, f"打开串口失败: {e}\n")
+            messagebox.showerror("tips","open uart failed:{e}")    
     
     def UL_read_data(self,port,baudrate,queue):
         ser = serial.Serial(port, baudrate, timeout=1)
@@ -539,10 +603,6 @@ class SerialAssistant:
                         else:
                             print(f"Invalid index: {idx}")
                             continue
-                        self.text_box.insert(tk.END, "用户 " + str(idx) + "  |  " + "nLos: " + str(self.distance_list[idx]['nLos'])  +  "  |  " +"主,从,门,  " \
-                                             + str(self.distance_list[idx]['MasterDistance']) + " ," + str(self.distance_list[idx]['SlaverDistance']) +" ,"  \
-                                                + str(self.distance_list[idx]['GateDistance']) + " <cm>" + "\n")
-                        self.text_box.see(tk.END)
                         
                         if self.Master2SlverDistance == 0:
                             self.Master2SlverDistance = self.distance_list[idx]['GateDistance']
@@ -553,8 +613,12 @@ class SerialAssistant:
                         self.z = self.distance_list[idx]['CoorZ_Arr'][-1]
                         if self.modeCombo.get() == "LIFT":
                             self.y = math.sqrt(abs(self.y**2 - 35*35))  
-                        self.text_box2.insert(tk.END,f"<user,x,y,z>, {idx} , {self.x-200:.0f} , {self.y-60:.0f} ,{self.z:.0f}\n")
-                        self.text_box2.see(tk.END)
+
+                        self.table_one_data = (self.table_IDX, idx, self.distance_list[idx]['nLos'], self.distance_list[idx]['MasterDistance'], self.distance_list[idx]['SlaverDistance'], \
+                                           self.distance_list[idx]['GateDistance'], json_data['Speed'], int(self.x-200), int(self.y-60), int(self.z))
+                        self.table_IDX += 1
+                        self.insert_data(self.table_one_data)
+
                         print("Use_KF:",self.Use_KF)
                         if self.Use_KF == True:
                             self.cor = [self.x,self.y]
@@ -603,7 +667,7 @@ class SerialAssistant:
                                 self.distance_list[idx]['CoorY_Arr'] = self.distance_list[idx]['CoorY_Arr'][-19:]
                                 self.distance_list[idx]['CoorZ_Arr'] = self.distance_list[idx]['CoorZ_Arr'][-19:]
             except serial.SerialException:
-                self.text_box.insert(tk.END, "串口连接已断开\n")
+                messagebox.showerror("tips","uart connect error:{e}")    
                 break
     def draw_data(self):
         while self.serial and self.serial.is_open:
@@ -831,8 +895,6 @@ class SerialAssistant:
         #     data_slave2 = self.queue_com3.get_nowait()
 
         #     if data_master is not None and data_slave1 is not None and data_slave2 is not None:
-        #         self.text_box.insert(tk.END,f"<Master:> {data_master} , <Slave1:> {data_slave1} , <Slave2:> {data_slave2} \n")
-        #         self.text_box.see(tk.END)
 
         #         self.DSi_M = self.cacl_timediff(data_master,data_slave1,data_slave2)       #计算时间差
         #         ChanINS = ChanALG_LSE(self.DSi_M,self.Anchor_position,self.Q)
