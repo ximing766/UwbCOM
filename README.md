@@ -18,7 +18,7 @@ uwbenv\Scripts\activate
 2：执行
 
 ```
-pyinstaller --noconsole --onefile -i UWB.ico --add-data "UWB.ico;." --name "UwbCOM_V1.1" UwbCOM.py
+pyinstaller --noconsole --onefile -i UWBCOM.ico --add-data "UWBCOM.ico;." --name "UwbCOM_V1.4" UwbCOM.py
 ```
 
 3：若失败，在生成的spec添加一行后执行4
@@ -45,9 +45,9 @@ UWB的串口GUI工具，显示用户位置。
 
 - 支持AOA定位方案
 
-- 支持UL-TDOA定位方案(待连接硬件验证)
-
 - 支持不同类型场景的定位方案切换
+
+- 数据接收json，存储为csv
 
   
 

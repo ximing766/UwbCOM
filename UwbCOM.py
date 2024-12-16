@@ -15,8 +15,10 @@ from collections import deque
 import time
 import warnings
 import json
+import re
 import csv
 import os
+import webbrowser
 import configparser
 import matplotlib.pyplot as plt
 from sklearn.linear_model import LinearRegression
@@ -38,9 +40,9 @@ class SerialAssistant:
         # self.config.read('./config/init.ini')
         # self.version = self.config['DEFAULT']['Version']
         # self.Window = self.config['DEFAULT']['Window']
-        # test
 
-        self.master.title("UwbCOM V1.3")
+        self.version = "V1.4"
+        self.master.title("UwbCOM " + self.version)
         self.master.minsize(900, 835)
         self.master.geometry("900x835")
         icon_path = os.path.join(os.path.dirname(__file__), 'UWBCOM.ico')
@@ -104,14 +106,18 @@ class SerialAssistant:
         ## ** User Define ** ##
         #Emoji._ITEMS[i].name                               "🤨"
         print(Emoji._ITEMS[-20])
-        self.face = Emoji.get("winking face")
+        self.face                 = Emoji.get("winking face")
+        self.PosInfo              = "@POSITION"
+        self.CardInfo             = "@CARDINFO"
+        self.pos_pattern          = re.compile(self.PosInfo)
+        self.card_pattern         = re.compile(self.CardInfo)
         self.init_draw            = 0                       #限制除用户外，其它图形多次作图
         self.flag_str             = ""                      #判断需要获取的卡信息种类
-        self.Master2SlverDistance = 0                       
-        self.radius               = 0  
-        self.nLos_radis           = 0         
-        self.lift_deep            = 0                       
-        self.lift_height          = 0                       
+        self.Master2SlverDistance = 0
+        self.radius               = 0
+        self.nLos_radis           = 0
+        self.lift_deep            = 0
+        self.lift_height          = 0
         self.red_height           = 0
         self.blue_height          = 250
         
@@ -242,6 +248,9 @@ class SerialAssistant:
         frame_comm_L.grid_columnconfigure(0, weight=1)
         table_columns = ('ID','User','nLos','D-Master','D-Slaver','D-Gate','Speed','x','y','z')
         self.Table = ttk.Treeview(frame_comm_L, columns=table_columns,show='headings',bootstyle="info")
+        self.Table.tag_configure('oddrow', background='#ECECEC')
+        self.Table.tag_configure('evenrow', background='#FFFFFF')
+
         for col in table_columns:
             self.Table.heading(col, text=col, anchor='w')
         self.SetTableColumns()
@@ -390,7 +399,12 @@ class SerialAssistant:
         if children:
             self.Table.yview_moveto(1.0)
     def insert_data(self, data):
-        self.Table.insert('','end',values=data)
+        self.table_flag = 0
+        if self.table_flag==0:
+            self.Table.insert('','end',values=data, tags=('evenrow',))
+        else:
+            self.Table.insert('','end',values=data, tags=('oddrow',))
+        self.table_flag = 1 - self.table_flag
         self.table_scroll()
     
     def SetTableColumns(self):
@@ -419,16 +433,14 @@ class SerialAssistant:
         self.last_idx = None
         self.table_data = []
 
-    def get_table_data(self):
-        if not hasattr(self, 'table_data'):
-            self.table_data = []
-            print("Enter hasattr")
-        for item in self.Table.get_children():
-            row_data = self.Table.item(item)['values']
-            if self.last_idx == None or self.last_idx < row_data[0]:
-                self.table_data.append(row_data)
-                self.last_idx = row_data[0]
-                print(f'last_idx:{self.last_idx}')
+    # def get_table_data(self):
+    #     if not hasattr(self, 'table_data'):
+    #         self.table_data = []
+    #     for item in self.Table.get_children():
+    #         row_data = self.Table.item(item)['values']
+    #         if self.last_idx == None or self.last_idx < row_data[0]:
+    #             self.table_data.append(row_data)
+    #             self.last_idx = row_data[0]
 
     def on_clearAndSave_text(self,flag):
         if flag == 1:
@@ -453,7 +465,7 @@ class SerialAssistant:
     
     def on_checkbutton_click_distance(self):
         if self.check_var1.get() == 1:
-            self.get_table_data()
+            # self.get_table_data()
             self.plotter = MultiPlotter(self.table_data)
             self.plotter.plot_distance()
         else:
@@ -461,7 +473,7 @@ class SerialAssistant:
             
     def on_checkbutton_click_speed(self):
         if self.check_var2.get() == 1:
-            self.get_table_data()
+            # self.get_table_data()
             self.plotter = MultiPlotter(self.table_data)
             self.plotter.plot_speed()
         else:
@@ -469,7 +481,7 @@ class SerialAssistant:
 
     def on_checkbutton_click_xyz(self):
         if self.check_var3.get() == 1:
-            self.get_table_data()
+            # self.get_table_data()
             self.plotter = MultiPlotter(self.table_data)
             self.plotter.plot_xyz()
         else:
@@ -525,7 +537,7 @@ class SerialAssistant:
     
     def open_serial(self):
         try:
-            self.serial = serial.Serial(self.combo.get(), self.baudCombo.get(), timeout=1)
+            self.serial = serial.Serial(self.combo.get(), self.baudCombo.get(), timeout=0)
             
             self.data_queue  = queue.Queue()
             self.read_thread = threading.Thread(target=self.read_data)
@@ -564,23 +576,19 @@ class SerialAssistant:
         pass
     
     def read_data(self):
-        self.PosInfo = "@POSITION"
-        self.CardInfo = "@CARDINFO";
         while self.serial and self.serial.is_open:
-
             self.current_time = time.time()
             if self.last_call_time is None:
                 self.last_call_time = self.current_time
             elif self.current_time - self.last_call_time >= 1:
-                print(f"@ Location has been updated {self.CallCount} times in the last second.")
+                # print(f"@ Location has been updated {self.CallCount} times in the last second.")
                 self.CallCount = 0 
                 self.last_call_time = self.current_time
             try:
                 if (data := self.serial.readline()):
                     data = data.decode('utf-8',errors='replace')
-                    if self.CardInfo in data:
-                        self.show_cardData(data)                                            
-                    if self.PosInfo in data:               
+                                                               
+                    if self.pos_pattern.search(data):               
                         try:
                             json_data = json.loads(data)
                         except json.JSONDecodeError as e:
@@ -624,6 +632,7 @@ class SerialAssistant:
                                            self.distance_list[idx]['GateDistance'], json_data['Speed'], int(self.x-200), int(self.y-60), int(self.z))
                         self.table_IDX += 1
                         self.insert_data(self.table_one_data)
+                        self.table_data.append(list(self.table_one_data))
 
                         # print("Use_KF:",self.Use_KF)
                         if self.Use_KF == True:
@@ -672,6 +681,8 @@ class SerialAssistant:
                                 self.distance_list[idx]['CoorX_Arr'] = self.distance_list[idx]['CoorX_Arr'][-19:]
                                 self.distance_list[idx]['CoorY_Arr'] = self.distance_list[idx]['CoorY_Arr'][-19:]
                                 self.distance_list[idx]['CoorZ_Arr'] = self.distance_list[idx]['CoorZ_Arr'][-19:]
+                    if self.card_pattern.search(data):
+                        self.show_cardData(data) 
             except serial.SerialException:
                 messagebox.showerror("tips","uart connect error:{e}")    
                 break
@@ -1042,7 +1053,7 @@ class SerialAssistant:
         return new_arr_x , new_arr_y
 
     def show_about(self):
-        messagebox.showinfo("关于", "UwbCOM v1.1\n\n"
+        messagebox.showinfo("关于", "UwbCOM {self.version}\n\n"
                              "版权所有 © 2024 可为信息技术有限公司\n"
                              "Author: @QLL\n"
                              "Email: qill@cardshare.cn\n"
@@ -1059,7 +1070,7 @@ def main():
     root   = tk.Tk()
     themes = ['cosmo', 'flatly', 'litera', 'minty', 'lumen', 'sandstone', 'yeti', 'pulse', 'united', 'morph', 'journal', 'darkly', 'superhero', \
               'solar', 'cyborg', 'vapor', 'simplex', 'cerculean']
-    style = ttk.Style("yeti")
+    style = ttk.Style("minty")
     app   = SerialAssistant(root)
     print(style.theme_names())
     def change_theme(theme_name):
@@ -1076,6 +1087,9 @@ def main():
     about_menu = tk.Menu(menubar, tearoff=0)
     menubar.add_cascade(label="关于", menu=about_menu)
     about_menu.add_command(label="关于", command=app.show_about)
+
+    source_menu = tk.Menu(menubar, tearoff=0)
+    menubar.add_cascade(label="Source", command=lambda: webbrowser.open("https://github.com/ximing766/UwbCOM"))
 
     filter_menu = tk.Menu(menubar, tearoff=0)
     menubar.add_cascade(label="滤波", menu=filter_menu)
