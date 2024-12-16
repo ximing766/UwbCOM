@@ -44,7 +44,7 @@ class MultiPlotter:
         plt.title("Speed")
         plt.xlabel("Index")
         plt.ylabel("Speed")
-        plt.legend(title="User")
+        # plt.legend(title="User")
         plt.show()
 
 
@@ -102,7 +102,7 @@ class MultiPlotter:
         plt.title("Z")
         plt.xlabel("Index")
         plt.ylabel("Z")
-        plt.legend(title="User")
+        # plt.legend(title="User")
 
         plt.show()
 
