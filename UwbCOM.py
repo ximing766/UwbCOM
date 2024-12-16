@@ -18,6 +18,7 @@ import json
 import csv
 import os
 import configparser
+import matplotlib.pyplot as plt
 from sklearn.linear_model import LinearRegression
 from sklearn.preprocessing import PolynomialFeatures
 from sklearn.linear_model import ElasticNet
@@ -135,6 +136,7 @@ class SerialAssistant:
         self.table_data           = []
         self.table_one_data       = 0
         self.table_IDX            = 0
+        self.last_idx             = None
         self.current_time         = 0
         self.last_call_time       = 0
         self.max_moves            = 15
@@ -258,36 +260,27 @@ class SerialAssistant:
         frame_comm_R_Top.grid(row=0, column=0, padx=1, pady=1,sticky='nsew')
         frame_comm_R_Top.grid_rowconfigure(0,weight=1)
         frame_comm_R_Top.grid_columnconfigure(0, weight=1)   
-        
-        frame_comm_R_Top_bt_width = 5
-        # 基础功能框架
-        # frame_comm_R_Top_bt = ttk.Frame(frame_comm_R_Top, width=frame_comm_R_Top_bt_width,height=frame_comm_R_Top_height,bootstyle="info")
-        # frame_comm_R_Top_bt.grid(row=0, column=1, padx=1, pady=1,sticky='nsew')
-        # frame_comm_R_Top_bt.grid_rowconfigure(0,weight=1)
-        # frame_comm_R_Top_bt.grid_rowconfigure(1,weight=1)
-        # frame_comm_R_Top_bt.grid_rowconfigure(2,weight=1)
-        # frame_comm_R_Top_bt.grid_columnconfigure(0, weight=1)
 
-        clear_bt = ttk.Button(frame_comm_R_Top, text="清除", command=lambda:self.on_clearAndSave_text(1),width=frame_comm_R_Top_bt_width,bootstyle="success-outline-toolbutton")
+        clear_bt = ttk.Button(frame_comm_R_Top, text="清除", command=lambda:self.on_clearAndSave_text(1),width=5,bootstyle="success-outline-toolbutton")
         clear_bt.grid(row=0, column=0, padx=1, pady=3,sticky='ew')
         
-        save_bt = ttk.Button(frame_comm_R_Top, text="保存", command=lambda:self.on_clearAndSave_text(2),width=frame_comm_R_Top_bt_width,bootstyle="success-outline-toolbutton")
+        save_bt = ttk.Button(frame_comm_R_Top, text="保存", command=lambda:self.on_clearAndSave_text(2),width=5,bootstyle="success-outline-toolbutton")
         save_bt.grid(row=1, column=0, padx=1, pady=3,sticky='ew')
 
         self.check_var1 = tk.IntVar()
-        Check_bt1 = ttk.Checkbutton(frame_comm_R_Top, text="Distance", command=lambda:self.on_checkbutton_click(), variable=self.check_var1, bootstyle="success-toolbutton")
+        Check_bt1 = ttk.Checkbutton(frame_comm_R_Top, text="Distance", command=lambda:self.on_checkbutton_click_distance(), variable=self.check_var1, bootstyle="success-toolbutton")
         Check_bt1.grid(row=0, column=1, padx=1, pady=3,sticky='ew')
 
         self.check_var2 = tk.IntVar()
-        Check_bt2 = ttk.Checkbutton(frame_comm_R_Top, text="Speed", command=lambda:self.on_checkbutton_click(), variable=self.check_var2, bootstyle="success-toolbutton")
+        Check_bt2 = ttk.Checkbutton(frame_comm_R_Top, text="Speed", command=lambda:self.on_checkbutton_click_speed(), variable=self.check_var2, bootstyle="success-toolbutton")
         Check_bt2.grid(row=1, column=1, padx=1, pady=3,sticky='ew')
 
         self.check_var3 = tk.IntVar()
-        Check_bt3 = ttk.Checkbutton(frame_comm_R_Top, text="XYZ", command=lambda:self.on_checkbutton_click(), variable=self.check_var3, bootstyle="success-toolbutton")
+        Check_bt3 = ttk.Checkbutton(frame_comm_R_Top, text="XYZ", command=lambda:self.on_checkbutton_click_xyz(), variable=self.check_var3, bootstyle="success-toolbutton")
         Check_bt3.grid(row=0, column=2, padx=1, pady=3,sticky='ew')
 
         self.check_var4 = tk.IntVar()
-        Check_bt4 = ttk.Checkbutton(frame_comm_R_Top, text="显示EED", command=lambda:self.on_checkbutton_click(), variable=self.check_var4, bootstyle="success-toolbutton")
+        Check_bt4 = ttk.Checkbutton(frame_comm_R_Top, text="显示EED", command=lambda:self.on_checkbutton_click_xyz(), variable=self.check_var4, bootstyle="success-toolbutton")
         Check_bt4.grid(row=1, column=2, padx=1, pady=3,sticky='ew')
 
         # 子总框下侧功能框(更具进度条的值，更新演示图中电梯的高度和深度,半径)
@@ -419,26 +412,23 @@ class SerialAssistant:
         else:
             self.serial_bt.config(text="打开串口", command=self.open_serial,bootstyle="primary")
 
-    def close_serial(self):
-        if self.serial: 
-            self.serial.close()
-            # self.text_box.insert(tk.END, "串口已关闭\n")
-
-            self.canvas.delete("all")       
-            self.Master2SlverDistance = 0   
-            self.serial_open          = False
-            self.update_serial_button()
-
     def clear_table(self):
         items = self.Table.get_children()
         for item in items[::-1]:
             self.Table.delete(item)
+        self.last_idx = None
+        self.table_data = []
 
     def get_table_data(self):
-        self.table_data = []
+        if not hasattr(self, 'table_data'):
+            self.table_data = []
+            print("Enter hasattr")
         for item in self.Table.get_children():
             row_data = self.Table.item(item)['values']
-            self.table_data.append(row_data)
+            if self.last_idx == None or self.last_idx < row_data[0]:
+                self.table_data.append(row_data)
+                self.last_idx = row_data[0]
+                print(f'last_idx:{self.last_idx}')
 
     def on_clearAndSave_text(self,flag):
         if flag == 1:
@@ -457,30 +447,34 @@ class SerialAssistant:
                     for row_id in self.Table.get_children():
                         row = self.Table.item(row_id)['values']
                         csvwriter.writerow(row)
-                messagebox.showinfo("tips","save file success!")
+                messagebox.showinfo("tips","save file success : ./UWB_Data.csv")
             except Exception as e:
                 messagebox.showerror("tips","save file failed:{e}")    
     
-    def on_checkbutton_click(self):
-        self.get_table_data()
-        plotter = MultiPlotter(self.table_data)
+    def on_checkbutton_click_distance(self):
         if self.check_var1.get() == 1:
-            plotter.plot_distance()
+            self.get_table_data()
+            self.plotter = MultiPlotter(self.table_data)
+            self.plotter.plot_distance()
         else:
-            plotter.close_plt(plotter.distance_fig)
-        
+            plt.close(self.plotter.distance_fig)
+            
+    def on_checkbutton_click_speed(self):
         if self.check_var2.get() == 1:
-            plotter.plot_speed()
+            self.get_table_data()
+            self.plotter = MultiPlotter(self.table_data)
+            self.plotter.plot_speed()
         else:
-            plotter.close_plt(plotter.speed_fig)
+            plt.close(self.plotter.speed_fig)
 
+    def on_checkbutton_click_xyz(self):
         if self.check_var3.get() == 1:
-            plotter.plot_xyz()
+            self.get_table_data()
+            self.plotter = MultiPlotter(self.table_data)
+            self.plotter.plot_xyz()
         else:
-            plotter.close_plt(plotter.xyz_fig)
-        # else:
-        #     messagebox.showerror("tips","please select the plot type!")
-    
+            plt.close(self.plotter.xyz_fig)
+
     def send_data(self,flag):
         self.flag_str = str(flag)
         self.serial.write(self.flag_str.encode())
@@ -544,6 +538,18 @@ class SerialAssistant:
 
         except Exception as e:
             messagebox.showerror("tips","open uart failed:{e}")    
+    
+    def close_serial(self):
+        if self.serial: 
+            self.serial.close()
+            # self.read_thread.join()
+            # self.draw_thread.join()
+            messagebox.showinfo("tips","Uart has been closed" )
+
+            self.canvas.delete("all")       
+            self.Master2SlverDistance = 0   
+            self.serial_open          = False
+            self.update_serial_button()
     
     def UL_read_data(self,port,baudrate,queue):
         ser = serial.Serial(port, baudrate, timeout=1)
@@ -619,7 +625,7 @@ class SerialAssistant:
                         self.table_IDX += 1
                         self.insert_data(self.table_one_data)
 
-                        print("Use_KF:",self.Use_KF)
+                        # print("Use_KF:",self.Use_KF)
                         if self.Use_KF == True:
                             self.cor = [self.x,self.y]
                             user_kf  = self.distance_list[idx]['KF']
@@ -627,7 +633,7 @@ class SerialAssistant:
                             user_kf.predict()
                             prediction = user_kf.update(z)
                             prediction = prediction.T.tolist()[0]
-                            print(f"KF_Filter : user {idx} prediction = {round(prediction[0]-400),round(prediction[1]-60)}")
+                            # print(f"KF_Filter : user {idx} prediction = {round(prediction[0]-400),round(prediction[1]-60)}")
                             self.distance_list[idx]["KF_predict"] = prediction
                             self.data_queue.put([self.distance_list[idx]["KF_predict"],idx])
                             # self.draw_user_KF(self.distance_list[idx]["KF_predict"],idx)
@@ -711,7 +717,7 @@ class SerialAssistant:
             canvas.move(oval_aoa, self.x_move_aoa, self.y_move_aoa)
             canvas.move(txt_aoa, self.x_move_aoa, self.y_move_aoa)
         self.move_times += 1
-        print(f"X_move = {self.x_move} Y_move = {self.y_move} moveing...{self.move_times}")
+        # print(f"X_move = {self.x_move} Y_move = {self.y_move} moveing...{self.move_times}")
         if self.Use_AOA:
             if self.move_times < self.max_moves and abs(start_x + self.x_move - end_x) > 0.1 and abs(start_y + self.y_move - end_y) > 0.1 and abs(start_y_aoa + self.y_move_aoa - end_y_aoa) > 0.1:
                 canvas.after(10, self.move_oval, canvas, oval, txt, start_x + self.x_move, start_y + self.y_move, end_x, end_y, 

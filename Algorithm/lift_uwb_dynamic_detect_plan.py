@@ -189,7 +189,6 @@ class UWBLiftAnimationPlan1:
 
 
 
-
 class UWBLiftAnimationPlan2:
     def __init__(self,radius=2.0,lift_deep=2.0,lift_height=3.0):
         # 创建数据
