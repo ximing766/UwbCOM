@@ -6,14 +6,15 @@ from matplotlib.animation import FuncAnimation
 class MultiPlotter:
     def __init__(self, data):
         self.data = data
+        self.idx    = [row[0] for row in data]
+        self.user   = [row[1] for row in data]
         self.Master = [row[3] for row in data]
         self.Slaver = [row[4] for row in data]
         self.Speed  = [row[6] for row in data]
         self.x      = [row[7] for row in data]
         self.y      = [row[8] for row in data]
         self.z      = [row[9] for row in data]
-        self.user   = [row[1] for row in data]
-        self.idx    = [row[0] for row in data]
+        
         self.palette = sns.color_palette("mako_r", len(set(self.user)))
     
     def update_data(self, data):
@@ -33,7 +34,6 @@ class MultiPlotter:
         sns.set_style("darkgrid")
         sns.set_context("notebook", font_scale=1.0, rc={"lines.linewidth": 1.5})
         sns.lineplot(x=range(len(self.Speed)), y=self.Speed, hue=self.user, palette=self.palette, legend="full", style=self.user)
-        plt.title("Speed")
         plt.xlabel("Index")
         plt.ylabel("Speed")
         plt.legend(title="User")
@@ -41,10 +41,7 @@ class MultiPlotter:
         sns.set_style("darkgrid")
         sns.set_context("notebook", font_scale=1.0, rc={"lines.linewidth": 1.5})
         sns.displot(x=self.Speed, kde=True, hue=self.user,palette=self.palette, element="step", fill = True, common_norm=False, alpha=0.2, height=4, aspect=1.2)
-        plt.title("Speed")
-        plt.xlabel("Index")
-        plt.ylabel("Speed")
-        # plt.legend(title="User")
+        plt.xlabel("speed")
         plt.show()
 
 
@@ -70,7 +67,7 @@ class MultiPlotter:
         # plt.subplots_adjust(left=0.1, right=0.9, bottom=0.1, top=0.9, wspace=0.4, hspace=0.6)
         plt.show()
     
-    def plot_xyz(self):
+    def plot_xyz(self, plot_z=True):
         self.xyz_fig = plt.figure(figsize=(10, 8))
         sns.set_style("darkgrid")
         sns.set_context("notebook", font_scale=1.0, rc={"lines.linewidth": 1.5})
@@ -87,22 +84,22 @@ class MultiPlotter:
         plt.ylabel("Y")
         plt.legend(title="User")
 
-        plt.figure(figsize=(8,6))
-        sns.set_style("darkgrid")
-        sns.set_context("notebook", font_scale=1.0, rc={"lines.linewidth": 1.5})
-        sns.lineplot(x=range(len(self.z)), y=self.z, hue=self.user, palette=self.palette, legend="full")
-        plt.title("Z")
-        plt.xlabel("Index")
-        plt.ylabel("Z")
-        plt.legend(title="User")
+        if plot_z:
+            plt.figure(figsize=(8,6))
+            sns.set_style("darkgrid")
+            sns.set_context("notebook", font_scale=1.0, rc={"lines.linewidth": 1.5})
+            sns.lineplot(x=range(len(self.z)), y=self.z, hue=self.user, palette=self.palette, legend="full")
+            plt.xlabel("Index")
+            plt.ylabel("Z")
+            plt.legend(title="User")
 
-        sns.set_style("darkgrid")
-        sns.set_context("notebook", font_scale=1.0, rc={"lines.linewidth": 1.5})
-        sns.displot(x=self.z, kde=True, hue=self.user, palette=self.palette, element="step", fill = True, common_norm=False, alpha=0.2, height=4, aspect=1.2)
-        plt.title("Z")
-        plt.xlabel("Index")
-        plt.ylabel("Z")
-        # plt.legend(title="User")
+            sns.set_style("darkgrid")
+            sns.set_context("notebook", font_scale=1.0, rc={"lines.linewidth": 1.5})
+            g = sns.displot(x=self.z, kde=True, hue=self.user, palette=self.palette, element="step", fill = True, common_norm=False, alpha=0.2, height=6, aspect=1.25)
+            fig = g.fig
+    
+            fig.subplots_adjust(left=0.1, bottom=0.1, right=0.9, top=0.9)
+            plt.xlabel("Z")
 
         plt.show()
 

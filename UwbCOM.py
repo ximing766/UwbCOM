@@ -16,8 +16,12 @@ import time
 import warnings
 import json
 import re
+import requests
+from packaging import version
 import csv
 import os
+import sys
+import logging
 import webbrowser
 import configparser
 import matplotlib.pyplot as plt
@@ -41,12 +45,18 @@ class SerialAssistant:
         # self.version = self.config['DEFAULT']['Version']
         # self.Window = self.config['DEFAULT']['Window']
 
-        self.version = "V1.4"
+        self.version = "V1.4.1"
         self.master.title("UwbCOM " + self.version)
-        self.master.minsize(900, 835)
-        self.master.geometry("900x835")
+        self.master.minsize(950, 835)
+        self.master.geometry("950x835")
         icon_path = os.path.join(os.path.dirname(__file__), 'UWBCOM.ico')
         self.master.wm_iconbitmap(icon_path)
+        self.app_path = os.path.dirname(sys.executable)
+        self.log_dir = os.path.join(self.app_path, 'Logs')
+        print(self.log_dir)
+        if not os.path.exists(self.log_dir):
+            os.makedirs(self.log_dir)
+        
 
         # 设置串口参数
         self.port         = "COM1"
@@ -135,7 +145,7 @@ class SerialAssistant:
         self.y                    = 0
         self.z                    = 0
         self.cor                  = []
-        self.Use_KF               = False    
+        self.Use_KF               = True    
         self.Use_AOA              = False   
 
         self.CallCount            = 0
@@ -154,6 +164,7 @@ class SerialAssistant:
 
         #实时更新串口选择框
         self.update_combobox_periodically()
+        self.update_canvas()
     
     def get_serial_ports(self):
         ports        = serial.tools.list_ports.comports()
@@ -170,7 +181,11 @@ class SerialAssistant:
     
     def update_combobox_periodically(self):
         self.update_combobox()
-        self.master.after(1000, self.update_combobox_periodically)  
+        self.master.after(3000, self.update_combobox_periodically) 
+
+    def update_canvas(self):
+        self.draw_data()
+        self.master.after(200, self.update_canvas) 
 
     def create_widgets(self):
         '''
@@ -185,22 +200,24 @@ class SerialAssistant:
         frame_settings.grid_columnconfigure(3, weight=1)
         frame_settings.grid_columnconfigure(4, weight=1)
         frame_settings.grid_columnconfigure(5, weight=1)
+        frame_settings.grid_columnconfigure(6, weight=1)
+        frame_settings.grid_columnconfigure(7, weight=1)
         frame_settings.grid_rowconfigure(0, weight=1)
         frame_settings.grid_rowconfigure(1, weight=1)
 
-        ttk.Label(frame_settings, text="COM" + Emoji._ITEMS[-106:][7].char,bootstyle="warning").grid(row=0, column=0, padx=1, pady=5,sticky='nsew')
+        ttk.Label(frame_settings, text="COM" + Emoji._ITEMS[-106:][7].char,bootstyle="warning").grid(row=0, column=0, padx=5, pady=5,sticky='nsew')
         self.port_var = tk.StringVar()
 
         self.combo = ttk.Combobox(frame_settings, values=self.get_serial_ports(),bootstyle="info")
         self.update_combobox()
-        self.combo.grid(row=0, column=1, padx=1, pady=5,sticky='nsew')
+        self.combo.grid(row=0, column=1, padx=5, pady=5,sticky='nsew')
 
-        ttk.Label(frame_settings, text="Baud" + Emoji._ITEMS[-106:][-4].char,bootstyle="warning").grid(row=1, column=0, padx=1, pady=5,sticky='nsew')
+        ttk.Label(frame_settings, text="Baud" + Emoji._ITEMS[-106:][-4].char,bootstyle="warning").grid(row=1, column=0, padx=5, pady=5,sticky='nsew')
         self.baudrate_var = tk.IntVar()
         
         self.baudCombo = ttk.Combobox(frame_settings,values=['3000000','115200','9600'],bootstyle="info")
         self.baudCombo.current(0)
-        self.baudCombo.grid(row=1, column=1, padx=1, pady=5,sticky='nsew')
+        self.baudCombo.grid(row=1, column=1, padx=5, pady=5,sticky='nsew')
 
         button_width = 8
         entry_width  = 20
@@ -208,7 +225,8 @@ class SerialAssistant:
         self.serial_bt = ttk.Button(frame_settings, text="打开串口", command=self.open_serial, width=button_width,bootstyle="info")
         self.serial_bt.grid(row=0, column=2, padx=5, pady=5,sticky='nsew')
 
-        self.modeCombo = ttk.Combobox(frame_settings,values=['GATE','LIFT','UL-TDOA','DL-TDOA'],width=button_width,bootstyle="info")
+        # self.modeCombo = ttk.Combobox(frame_settings,values=['GATE','LIFT','UL-TDOA','DL-TDOA'],width=button_width,bootstyle="info")
+        self.modeCombo = ttk.Combobox(frame_settings,values=['GATE'],width=button_width,bootstyle="info")
         self.modeCombo.current(0)
         self.modeCombo.grid(row=1, column=2, padx=5, pady=5,sticky='nsew')
         self.modeCombo.bind("<<ComboboxSelected>>", self.on_mode_change)
@@ -228,6 +246,17 @@ class SerialAssistant:
         other_Button2   = ttk.Button(frame_settings, text="交易记录", command=lambda:self.send_data(44444), width=button_width,bootstyle="primary").grid(row=1, column=6, padx=5, pady=5,sticky='nsew')
         self.text_area4 = ttk.Entry(frame_settings,width=entry_width,bootstyle="info")
         self.text_area4.grid(row=1, column=5, padx=5, pady=5, sticky='nsew')
+
+        image_path = self.resource_path('logo.png')
+        self.image = Image.open(image_path)
+        self.image.thumbnail((100, 30))
+        self.photo = ImageTk.PhotoImage(self.image)
+        self.label = ttk.Label(frame_settings, image=self.photo)
+        self.label.grid(row=0, column=7, columnspan=2,rowspan=1, padx=5, pady=5,sticky='nsew')
+        self.label.image = self.photo
+
+        self.txt_label = ttk.Label(frame_settings, text="仅授权小米内部使用",font=("Arial", 8),bootstyle="dark")
+        self.txt_label.grid(row=1, column=7, columnspan=2,rowspan=1, padx=5, pady=5,sticky='nsew')
         
         '''
         description: 通信区域
@@ -276,20 +305,16 @@ class SerialAssistant:
         save_bt = ttk.Button(frame_comm_R_Top, text="保存", command=lambda:self.on_clearAndSave_text(2),width=5,bootstyle="success-outline-toolbutton")
         save_bt.grid(row=1, column=0, padx=1, pady=3,sticky='ew')
 
-        self.check_var1 = tk.IntVar()
-        Check_bt1 = ttk.Checkbutton(frame_comm_R_Top, text="Distance", command=lambda:self.on_checkbutton_click_distance(), variable=self.check_var1, bootstyle="success-toolbutton")
+        Check_bt1 = ttk.Button(frame_comm_R_Top, text="Distance", command=lambda:self.on_checkbutton_click_distance(), bootstyle="success-outline")
         Check_bt1.grid(row=0, column=1, padx=1, pady=3,sticky='ew')
 
-        self.check_var2 = tk.IntVar()
-        Check_bt2 = ttk.Checkbutton(frame_comm_R_Top, text="Speed", command=lambda:self.on_checkbutton_click_speed(), variable=self.check_var2, bootstyle="success-toolbutton")
+        Check_bt2 = ttk.Button(frame_comm_R_Top, text="Speed", command=lambda:self.on_checkbutton_click_speed(), bootstyle="success-outline")
         Check_bt2.grid(row=1, column=1, padx=1, pady=3,sticky='ew')
 
-        self.check_var3 = tk.IntVar()
-        Check_bt3 = ttk.Checkbutton(frame_comm_R_Top, text="XYZ", command=lambda:self.on_checkbutton_click_xyz(), variable=self.check_var3, bootstyle="success-toolbutton")
+        Check_bt3 = ttk.Button(frame_comm_R_Top, text="X-Y-Z", command=lambda:self.on_checkbutton_click_xyz(), bootstyle="success-outline")
         Check_bt3.grid(row=0, column=2, padx=1, pady=3,sticky='ew')
 
-        self.check_var4 = tk.IntVar()
-        Check_bt4 = ttk.Checkbutton(frame_comm_R_Top, text="显示EED", command=lambda:self.on_checkbutton_click_xyz(), variable=self.check_var4, bootstyle="success-toolbutton")
+        Check_bt4 = ttk.Button(frame_comm_R_Top, text="...", command=lambda:self.on_checkbutton_click_xyz(), bootstyle="success-outline",state="disabled")
         Check_bt4.grid(row=1, column=2, padx=1, pady=3,sticky='ew')
 
         # 子总框下侧功能框(更具进度条的值，更新演示图中电梯的高度和深度,半径)
@@ -357,19 +382,20 @@ class SerialAssistant:
         progressbar3.bind("<Motion>", update_progressbar3_value)
         progressbar3.bind("<ButtonRelease-1>", update_progressbar3_value)
 
-        animation_button1 = ttk.Button(frame_comm_R_Bottom, text="演示 1", command=self.run_UWB_Lift_Animation_plan_1, width=5,bootstyle="info")
+        animation_button1 = ttk.Button(frame_comm_R_Bottom, text="demoA", command=self.run_UWB_Lift_Animation_plan_1, width=5,bootstyle="info",state="disable")
         animation_button1.grid(row=0, column=2, padx=1, pady=0,sticky='nsew')
         
-        animation_button2 = ttk.Button(frame_comm_R_Bottom, text="演示 2", command=self.run_UWB_Lift_Animation_plan_2, width=5,bootstyle="info")
+        animation_button2 = ttk.Button(frame_comm_R_Bottom, text="demoB", command=self.run_UWB_Lift_Animation_plan_2, width=5,bootstyle="info",state="disable")
         animation_button2.grid(row=1, column=2, padx=1, pady=1,sticky='nsew')
 
-        animation_button2 = ttk.Button(frame_comm_R_Bottom, text="占 位", command=self.run_UWB_Lift_Animation_plan_2, width=5,bootstyle="info")
+        animation_button2 = ttk.Button(frame_comm_R_Bottom, text="...", command=self.run_UWB_Lift_Animation_plan_2, width=5,bootstyle="info",state="disable")
         animation_button2.grid(row=2, column=2, padx=1, pady=1,sticky='nsew')
 
         '''
         description: 画布区域
         '''        
-        frame_draw = ttk.LabelFrame(self.master,text = "功能区",bootstyle="info")
+        # frame_draw = ttk.LabelFrame(self.master,text = "功能区",bootstyle="info")
+        frame_draw = ttk.LabelFrame(self.master,bootstyle="info")
         frame_draw.grid(row=3, column=0, padx=5, pady=5,sticky='nsew')
         frame_draw.grid_columnconfigure(0, weight=1)
 
@@ -377,12 +403,12 @@ class SerialAssistant:
         self.notebook.grid(row = 0, column = 0, padx = 1, pady = 1, sticky = 'nsew')
 
         self.canvas_frame = ttk.Frame(self.notebook)
-        self.notebook.add(self.canvas_frame, text = '画布')
+        self.notebook.add(self.canvas_frame, text = 'canvas')
         self.canvas_frame.grid_columnconfigure(0, weight=1)
 
-        self.other_frame = ttk.Frame(self.notebook)
-        self.notebook.add(self.other_frame, text = 'others')
-        self.other_frame.grid_columnconfigure(0, weight=1)
+        # self.other_frame = ttk.Frame(self.notebook)
+        # self.notebook.add(self.other_frame, text = 'others')
+        # self.other_frame.grid_columnconfigure(0, weight=1)
 
         self.canvas = tk.Canvas(self.canvas_frame,bg="white",height=390)
         self.canvas.grid(row=0, column=0, padx=5, pady=5,sticky='nsew')
@@ -394,6 +420,12 @@ class SerialAssistant:
         '''
         others
         '''
+
+    def resource_path(self, relative_path):
+        if hasattr(sys, '_MEIPASS'):
+            return os.path.join(sys._MEIPASS, relative_path)
+        return os.path.join(os.path.abspath("."), relative_path)
+    
     def table_scroll(self):
         children = self.Table.get_children()
         if children:
@@ -431,16 +463,8 @@ class SerialAssistant:
         for item in items[::-1]:
             self.Table.delete(item)
         self.last_idx = None
+        self.table_IDX = 0
         self.table_data = []
-
-    # def get_table_data(self):
-    #     if not hasattr(self, 'table_data'):
-    #         self.table_data = []
-    #     for item in self.Table.get_children():
-    #         row_data = self.Table.item(item)['values']
-    #         if self.last_idx == None or self.last_idx < row_data[0]:
-    #             self.table_data.append(row_data)
-    #             self.last_idx = row_data[0]
 
     def on_clearAndSave_text(self,flag):
         if flag == 1:
@@ -451,41 +475,44 @@ class SerialAssistant:
             self.text_area4.delete(0,tk.END)
         elif flag == 2:
             try:
+                self.log_file_path = os.path.join(self.log_dir, f'UWBCOM_Data_{time.strftime("%Y%m%d%H%M%S")}.csv')
+                logger = logging.getLogger('UWBLogger')
+                logger.setLevel(logging.INFO)
+                file_handler = logging.FileHandler(self.log_file_path)
+                # file_handler.setLevel(logging.INFO)
+                # log_format = logging.Formatter('%(asctime)s , %(levelname)s , %(message)s')
+                log_format = logging.Formatter('%(message)s')
+                file_handler.setFormatter(log_format)
+                logger.addHandler(file_handler)
+
                 columns = self.Table["columns"]
                 column_names = [self.Table.heading(column)['text'] for column in columns]
-                with open("./UWB_Data.csv",'w',newline='') as myfile:
-                    csvwriter = csv.writer(myfile, delimiter=',')
-                    csvwriter.writerow(column_names)
-                    for row_id in self.Table.get_children():
-                        row = self.Table.item(row_id)['values']
-                        csvwriter.writerow(row)
-                messagebox.showinfo("tips","save file success : ./UWB_Data.csv")
+                columns_str = ', '.join(column_names)
+                logger.info(columns_str)
+                for row_id in self.Table.get_children():
+                    row = self.Table.item(row_id)['values']
+                    row_str = ', '.join(map(str, row))
+                    logger.info(row_str)
+
+                messagebox.showinfo("tips",f"save file success : ./Logs/UWBCOM_Data.csv")
+                logger.removeHandler(file_handler)
+                file_handler.close()
             except Exception as e:
-                messagebox.showerror("tips","save file failed:{e}")    
+                messagebox.showerror("tips","save file failed:{}".format(e))    
     
     def on_checkbutton_click_distance(self):
-        if self.check_var1.get() == 1:
-            # self.get_table_data()
-            self.plotter = MultiPlotter(self.table_data)
-            self.plotter.plot_distance()
-        else:
-            plt.close(self.plotter.distance_fig)
+        self.plotter1 = MultiPlotter(self.table_data)
+        self.plotter1.plot_distance()
+
             
     def on_checkbutton_click_speed(self):
-        if self.check_var2.get() == 1:
-            # self.get_table_data()
-            self.plotter = MultiPlotter(self.table_data)
-            self.plotter.plot_speed()
-        else:
-            plt.close(self.plotter.speed_fig)
+        self.plotter2 = MultiPlotter(self.table_data)
+        self.plotter2.plot_speed()
 
     def on_checkbutton_click_xyz(self):
-        if self.check_var3.get() == 1:
-            # self.get_table_data()
-            self.plotter = MultiPlotter(self.table_data)
-            self.plotter.plot_xyz()
-        else:
-            plt.close(self.plotter.xyz_fig)
+        self.plotter3 = MultiPlotter(self.table_data)
+        self.plotter3.plot_xyz(self.Use_AOA)
+
 
     def send_data(self,flag):
         self.flag_str = str(flag)
@@ -537,31 +564,34 @@ class SerialAssistant:
     
     def open_serial(self):
         try:
-            self.serial = serial.Serial(self.combo.get(), self.baudCombo.get(), timeout=0)
+            self.serial = serial.Serial(self.combo.get(), self.baudCombo.get(), timeout=0.05)
             
             self.data_queue  = queue.Queue()
             self.read_thread = threading.Thread(target=self.read_data)
             self.read_thread.start()
-            self.draw_thread = threading.Thread(target=self.draw_data)
-            self.draw_thread.start()
-
+            # self.draw_thread = threading.Thread(target=self.draw_data)
+            # self.draw_thread.start()
+            
             self.serial_open = True
             self.update_serial_button()
 
         except Exception as e:
-            messagebox.showerror("tips","open uart failed:{e}")    
+            messagebox.showerror("tips","open uart failed:{}".format(e))    
     
     def close_serial(self):
-        if self.serial: 
-            self.serial.close()
-            # self.read_thread.join()
-            # self.draw_thread.join()
-            messagebox.showinfo("tips","Uart has been closed" )
+        try:
+            if self.serial: 
+                self.serial.close()
+                # self.read_thread.join()
+                # self.draw_thread.join()
+                # messagebox.showinfo("tips","Uart has been closed" )
 
-            self.canvas.delete("all")       
-            self.Master2SlverDistance = 0   
-            self.serial_open          = False
-            self.update_serial_button()
+                self.canvas.delete("all")       
+                self.Master2SlverDistance = 0   
+                self.serial_open          = False
+                self.update_serial_button()
+        except Exception as e:
+            messagebox.showerror("tips","close uart failed:{}".format(e))
     
     def UL_read_data(self,port,baudrate,queue):
         ser = serial.Serial(port, baudrate, timeout=1)
@@ -592,7 +622,8 @@ class SerialAssistant:
                         try:
                             json_data = json.loads(data)
                         except json.JSONDecodeError as e:
-                            print("json error", e)
+                            # messagebox.showerror("tips","JSON Decode Error:{}".format(e)) 
+                            pass
                         idx = json_data['idx']
                         if 0 <= idx < len(self.distance_list):
                             self.distance_list[idx]['MasterDistance'] = json_data['Master']
@@ -628,8 +659,12 @@ class SerialAssistant:
                         if self.modeCombo.get() == "LIFT":
                             self.y = math.sqrt(abs(self.y**2 - 35*35))  
 
+                        if self.Use_AOA == True:
+                            data_x = int(self.x - 200)
+                        else:
+                            data_x = int(self.x - 400)
                         self.table_one_data = (self.table_IDX, idx, self.distance_list[idx]['nLos'], self.distance_list[idx]['MasterDistance'], self.distance_list[idx]['SlaverDistance'], \
-                                           self.distance_list[idx]['GateDistance'], json_data['Speed'], int(self.x-200), int(self.y-60), int(self.z))
+                                           self.distance_list[idx]['GateDistance'], json_data['Speed'], data_x, int(self.y-60), int(self.z))
                         self.table_IDX += 1
                         self.insert_data(self.table_one_data)
                         self.table_data.append(list(self.table_one_data))
@@ -684,22 +719,22 @@ class SerialAssistant:
                     if self.card_pattern.search(data):
                         self.show_cardData(data) 
             except serial.SerialException:
-                messagebox.showerror("tips","uart connect error:{e}")    
+                messagebox.showerror("tips","uart connect error:{}".format(e))    
                 break
     def draw_data(self):
-        while self.serial and self.serial.is_open:
+        if self.serial_open:
             try:
-                # 阻塞
-                data = self.data_queue.get()
+                data = self.data_queue.get_nowait()
+                # print("tips","queue get data")
                 if self.Use_KF:
                     self.draw_user_KF(data[0], data[1])
                 else:
                     self.draw_user_EN(data[0], data[1])
+            except queue.Empty:
+                print("tips","queue is empty")
+                pass
             except Exception as e:
-                print(f"Error drawing data: {e}")
-            finally:
-                # 防止join线程阻塞
-                self.data_queue.task_done()  
+                print("tips","draw_data error:{}".format(e)) 
 
     def check_nLos(self):
         for idx, item in enumerate(self.distance_list):
@@ -1051,12 +1086,42 @@ class SerialAssistant:
             print(f'delete corrdinate is :{data[outliers_x]}')
         
         return new_arr_x , new_arr_y
+    def update_app(self):
+        url = "https://api.github.com/repos/{owner}/{repo}/releases/latest"
+        owner = "ximing766"
+        repo = "UwbCOM"
+        print(url.format(owner=owner, repo=repo))
+        response = requests.get(url.format(owner=owner, repo=repo))
+
+        if response.status_code == 200:
+            release_data = response.json()
+            latest_version = release_data['tag_name']
+            if version.parse(latest_version) > version.parse(self.version):
+                self.result = messagebox.askquestion("update", "发现新版本，是否更新？")
+                if self.result == "yes":
+                    for asset in release_data['assets']:
+                        download_url = asset['browser_download_url']
+                        print(f"Download URL: {download_url}")
+                        response = requests.get(download_url, stream=True)
+                        if response.status_code == 200:
+                            with open(asset['name'], 'wb') as file:
+                                for chunk in response.iter_content(chunk_size=8192):
+                                    file.write(chunk)
+                            messagebox.showinfo("update", f"更新完成:{asset['name']}")
+                        else:
+                            messagebox.showinfo("update", "下载失败")
+                else:
+                    messagebox.showinfo("update", "取消更新")
+            else:
+                messagebox.showinfo("update", "已是最新版本")
+        else:
+            print("Failed to retrieve release data")
 
     def show_about(self):
-        messagebox.showinfo("关于", "UwbCOM {self.version}\n\n"
+        messagebox.showinfo("关于", f"UwbCOM {self.version}\n\n"
                              "版权所有 © 2024 可为信息技术有限公司\n"
                              "Author: @QLL\n"
-                             "Email: qill@cardshare.cn\n"
+                             "Email: Tommy.yang@cardshare.cn\n"
                             )
         
     def run_UWB_Lift_Animation_plan_1(self):
@@ -1086,15 +1151,16 @@ def main():
 
     about_menu = tk.Menu(menubar, tearoff=0)
     menubar.add_cascade(label="关于", menu=about_menu)
-    about_menu.add_command(label="关于", command=app.show_about)
+    about_menu.add_command(label = "关于", command=app.show_about)
+    # about_menu.add_command(label = "更新", command=app.update_app)
 
-    source_menu = tk.Menu(menubar, tearoff=0)
-    menubar.add_cascade(label="Source", command=lambda: webbrowser.open("https://github.com/ximing766/UwbCOM"))
+    # source_menu = tk.Menu(menubar, tearoff=0)
+    # menubar.add_cascade(label="Source", command=lambda: webbrowser.open("https://github.com/ximing766/UwbCOM"))
 
-    filter_menu = tk.Menu(menubar, tearoff=0)
-    menubar.add_cascade(label="滤波", menu=filter_menu)
-    kalman_filter_menu = filter_menu.add_command(label="Kalman-Filter", command=lambda:app.change_filter(True))
-    elasticnet_filter_menu = filter_menu.add_command(label="ElasticNet", command=lambda:app.change_filter(False))
+    # filter_menu = tk.Menu(menubar, tearoff=0)
+    # menubar.add_cascade(label="滤波", menu=filter_menu)
+    # kalman_filter_menu = filter_menu.add_command(label="Kalman-Filter", command=lambda:app.change_filter(True))
+    # elasticnet_filter_menu = filter_menu.add_command(label="ElasticNet", command=lambda:app.change_filter(False))
     
     root.mainloop()
 
