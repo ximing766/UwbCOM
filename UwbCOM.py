@@ -117,8 +117,8 @@ class SerialAssistant:
         #Emoji._ITEMS[i].name                               "🤨"
         print(Emoji._ITEMS[-20])
         self.face                 = Emoji.get("winking face")
-        self.PosInfo              = "@POSITION"
-        self.CardInfo             = "@CARDINFO"
+        self.PosInfo              = "@POSI"
+        self.CardInfo             = "@CARD"
         self.pos_pattern          = re.compile(self.PosInfo)
         self.card_pattern         = re.compile(self.CardInfo)
         self.init_draw            = 0                       #限制除用户外，其它图形多次作图
@@ -145,7 +145,7 @@ class SerialAssistant:
         self.y                    = 0
         self.z                    = 0
         self.cor                  = []
-        self.Use_KF               = True    
+        self.Use_KF               = False    
         self.Use_AOA              = False   
 
         self.CallCount            = 0
@@ -155,7 +155,7 @@ class SerialAssistant:
         self.last_idx             = None
         self.current_time         = 0
         self.last_call_time       = 0
-        self.max_moves            = 15
+        self.max_moves            = 10
         self.move_times           = 0
         self.x_move               = 0
         self.y_move               = 0
@@ -164,7 +164,7 @@ class SerialAssistant:
 
         #实时更新串口选择框
         self.update_combobox_periodically()
-        self.update_canvas()
+        # self.update_canvas()
     
     def get_serial_ports(self):
         ports        = serial.tools.list_ports.comports()
@@ -185,7 +185,7 @@ class SerialAssistant:
 
     def update_canvas(self):
         self.draw_data()
-        self.master.after(200, self.update_canvas) 
+        self.master.after(100, self.update_canvas) 
 
     def create_widgets(self):
         '''
@@ -318,7 +318,7 @@ class SerialAssistant:
         Check_bt4.grid(row=1, column=2, padx=1, pady=3,sticky='ew')
 
         # 子总框下侧功能框(更具进度条的值，更新演示图中电梯的高度和深度,半径)
-        frame_comm_R_Bottom = ttk.LabelFrame(frame_comm_R, width=300, height=15,text="Elevator scheme demonstration",bootstyle="info")
+        frame_comm_R_Bottom = ttk.LabelFrame(frame_comm_R, width=300, height=15,text="demonstration",bootstyle="info")
         frame_comm_R_Bottom.grid(row=1, column=0, padx=1, pady=1,sticky='nsew')
         frame_comm_R_Bottom.grid_rowconfigure(0,weight=1)
         frame_comm_R_Bottom.grid_rowconfigure(1,weight=1)
@@ -331,7 +331,7 @@ class SerialAssistant:
         progressbar1.set(2.0)
 
         # 添加一个标签来显示第一个进度条的值
-        progressbar1_value = tk.StringVar(value=f"LIFT_D : {progressbar1.get():.1f}")
+        progressbar1_value = tk.StringVar(value=f"Deep : {progressbar1.get():.1f}")
         progressbar1_label = ttk.Label(frame_comm_R_Bottom, textvariable=progressbar1_value)
         progressbar1_label.grid(row=0, column=0, padx=1, pady=1, sticky='nsew')
 
@@ -350,7 +350,7 @@ class SerialAssistant:
         progressbar2.set(3.0)
 
         # 赋值给self.lift_height
-        progressbar2_value = tk.StringVar(value=f"LIFT_H : {progressbar2.get():.1f}")
+        progressbar2_value = tk.StringVar(value=f"Height : {progressbar2.get():.1f}")
         progressbar2_label = ttk.Label(frame_comm_R_Bottom, textvariable=progressbar2_value)
         progressbar2_label.grid(row=1, column=0, padx=1, pady=1, sticky='nsew')
 
@@ -611,7 +611,7 @@ class SerialAssistant:
             if self.last_call_time is None:
                 self.last_call_time = self.current_time
             elif self.current_time - self.last_call_time >= 1:
-                # print(f"@ Location has been updated {self.CallCount} times in the last second.")
+                print(f"@ Location has been updated {self.CallCount} times in the last second.")
                 self.CallCount = 0 
                 self.last_call_time = self.current_time
             try:
@@ -663,6 +663,7 @@ class SerialAssistant:
                             data_x = int(self.x - 200)
                         else:
                             data_x = int(self.x - 400)
+
                         self.table_one_data = (self.table_IDX, idx, self.distance_list[idx]['nLos'], self.distance_list[idx]['MasterDistance'], self.distance_list[idx]['SlaverDistance'], \
                                            self.distance_list[idx]['GateDistance'], json_data['Speed'], data_x, int(self.y-60), int(self.z))
                         self.table_IDX += 1
@@ -671,6 +672,7 @@ class SerialAssistant:
 
                         # print("Use_KF:",self.Use_KF)
                         if self.Use_KF == True:
+                            self.CallCount += 1
                             self.cor = [self.x,self.y]
                             user_kf  = self.distance_list[idx]['KF']
                             z        = np.matrix(self.cor).T
@@ -679,8 +681,8 @@ class SerialAssistant:
                             prediction = prediction.T.tolist()[0]
                             # print(f"KF_Filter : user {idx} prediction = {round(prediction[0]-400),round(prediction[1]-60)}")
                             self.distance_list[idx]["KF_predict"] = prediction
-                            self.data_queue.put([self.distance_list[idx]["KF_predict"],idx])
-                            # self.draw_user_KF(self.distance_list[idx]["KF_predict"],idx)
+                            # self.data_queue.put([self.distance_list[idx]["KF_predict"],idx])
+                            self.draw_user_KF(self.distance_list[idx]["KF_predict"],idx)
                         else:
                             self.distance_list[idx]['ZScoreFlag'] += 1
                             if len(self.distance_list[idx]['CoorX_Arr']) == 20:                                                                
@@ -706,8 +708,8 @@ class SerialAssistant:
                                     if  abs(self.distance_list[idx]['Start_X'] - self.distance_list[idx]['CoorX_Arr'][-1]) > 2 or  \
                                         abs(self.distance_list[idx]['Start_Y'] - self.distance_list[idx]['CoorY_Arr'][-1]) > 2 or  \
                                         abs(self.distance_list[idx]['Start_Y_AOA'] - self.distance_list[idx]['CoorZ_Arr'][-1]) > 2:
-                                        self.data_queue.put([self.distance_list,idx])
-                                        # self.draw_user_EN(self.distance_list,idx)  
+                                        # self.data_queue.put([self.distance_list,idx])
+                                        self.draw_user_EN(self.distance_list,idx)  
 
                                     self.distance_list[idx]['CoorX_Arr'] = np.delete(self.distance_list[idx]['CoorX_Arr'],[0])           
                                     self.distance_list[idx]['CoorY_Arr'] = np.delete(self.distance_list[idx]['CoorY_Arr'],[0])
@@ -751,11 +753,11 @@ class SerialAssistant:
     '''    
     def move_oval(self,canvas, oval, txt, start_x, start_y, end_x, end_y, oval_aoa, txt_aoa, start_x_aoa,start_y_aoa,end_x_aoa,end_y_aoa ,uniform_speed=1):
         if uniform_speed == 1:
-            self.x_move = (end_x - start_x) / 15
-            self.y_move = (end_y - start_y) / 15
+            self.x_move = (end_x - start_x) / 10
+            self.y_move = (end_y - start_y) / 10
             if self.Use_AOA:
-                self.x_move_aoa = (end_x_aoa - start_x_aoa) / 15
-                self.y_move_aoa = - (end_y_aoa - start_y_aoa) / 15
+                self.x_move_aoa = (end_x_aoa - start_x_aoa) / 10
+                self.y_move_aoa = - (end_y_aoa - start_y_aoa) / 10
         
         canvas.move(oval, self.x_move, self.y_move)
         canvas.move(txt, self.x_move, self.y_move)
@@ -798,7 +800,7 @@ class SerialAssistant:
             elif self.canvas.find_withtag("nLos"):
                 self.canvas.delete("nLos")
         # create user in the first time
-        if not self.canvas.find_withtag(tags): 
+        if not self.canvas.find_withtag(tags):
             print(f'Create user_{idx}')
             self.user_oval[f'user_{idx}_oval'] = self.canvas.create_oval(user[idx]['CoorX_Arr'][-1]-5, user[idx]['CoorY_Arr'][-1]-5, user[idx]['CoorX_Arr'][-1]+5,  
                                                                          user[idx]['CoorY_Arr'][-1]+5, outline=self.colors[idx], fill=self.colors[idx],tags=("user" + str(idx)))
@@ -853,7 +855,7 @@ class SerialAssistant:
                 self.move_oval(self.canvas,self.user_oval[f'user_{idx}_oval'], self.user_txt[f'user_{idx}_txt'], self.distance_list[idx]['Start_X'], self.distance_list[idx]['Start_Y'], round(user[0]), round(user[1]), None, None, None, None, None, None)
         self.distance_list[idx]['Start_X'] = round(user[0])
         self.distance_list[idx]['Start_Y'] = round(user[1])
-        self.distance_list[idx]['Start_X_AOA'] = round(user[1])+440
+        self.distance_list[idx]['Start_X_AOA'] = round(user[1]) + 440
         self.distance_list[idx]['Start_Y_AOA'] = 250 - self.z
 
     def draw_basic(self, idx):
