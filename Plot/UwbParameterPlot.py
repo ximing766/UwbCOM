@@ -1,6 +1,8 @@
 import seaborn as sns
 import matplotlib.pyplot as plt
+import numpy as np
 import time
+import pandas as pd
 from matplotlib.animation import FuncAnimation
 
 class MultiPlotter:
@@ -50,17 +52,33 @@ class MultiPlotter:
         sns.set_style("darkgrid")
         sns.set_context("notebook", font_scale=1.0, rc={"lines.linewidth": 1.5})
 
+        # residuals_Master = [x - d1 for x in self.Master]
+        # residuals_Slaver = [x - d2 for x in self.Slaver]
+
+        # 计算残差的标准差
+        # std_Master = np.std(residuals_Master)
+        # std_Slaver = np.std(residuals_Slaver)
+
+        std_Master = np.std(self.Master)
+        std_Slaver = np.std(self.Slaver)
+        avg_Master = np.average(self.Master)
+        avg_Slaver = np.average(self.Slaver)
+
         plt.subplot(2, 1, 1)
         sns.lineplot(x=range(len(self.Master)), y=self.Master, hue=self.user, palette=self.palette, legend="full", style=self.user)
-        plt.title("Master-Slaver")
+        plt.title("Trend Chart of Distance")
         plt.ylabel("Master")
         plt.legend(title="User")
+        if len(set(self.user)) == 1:
+            plt.text(0.05, 0.95, "std: {:.1f}  avg: {:.1f}".format(std_Master, avg_Master), transform=plt.gca().transAxes, fontsize=12, verticalalignment='top')
 
         plt.subplot(2, 1, 2)
         sns.lineplot(x=range(len(self.Slaver)), y=self.Slaver, hue=self.user, palette=self.palette, legend="full")
         plt.xlabel("Index")
         plt.ylabel("Slaver")
         plt.legend(title="User")
+        if len(set(self.user)) == 1:
+            plt.text(0.05, 0.95, "std: {:.1f}  avg: {:.1f}".format(std_Slaver, avg_Slaver), transform=plt.gca().transAxes, fontsize=12, verticalalignment='top') 
 
         # 调整子图间距
         # plt.tight_layout()
@@ -68,27 +86,49 @@ class MultiPlotter:
         plt.show()
     
     def plot_xyz(self, plot_z=True):
-        self.xyz_fig = plt.figure(figsize=(10, 8))
         sns.set_style("darkgrid")
         sns.set_context("notebook", font_scale=1.0, rc={"lines.linewidth": 1.5})
 
-        plt.subplot(2, 1, 1)
-        sns.lineplot(x=range(len(self.x)), y=self.x, hue=self.user, palette=self.palette, legend="full", style=self.user)
-        plt.title("X-Y")
-        plt.ylabel("X")
-        plt.legend(title="User")
+        avg_x = np.average(self.x)
+        avg_y = np.average(self.y)
+        avg_z = np.average(self.z)
+        std_x = np.std(self.x)
+        std_y = np.std(self.y)
+        std_z = np.std(self.z)
 
-        plt.subplot(2, 1, 2)
-        sns.lineplot(x=range(len(self.y)), y=self.y, hue=self.user, palette=self.palette, legend="full", style= self.user)
-        plt.xlabel("Index")
+        df = pd.DataFrame({'x': self.x, 'y': self.y})
+        sns.jointplot(x='x', y='y', data=df, hue=self.user, palette=self.palette)
+        # sns.jointplot(x='x', y='y', data=df, palette=self.palette, kind="reg")
+        # plt.title("User Position Distribution")
+        plt.xlabel("X")
         plt.ylabel("Y")
         plt.legend(title="User")
+        if len(set(self.user)) == 1:
+            plt.text(0.05, 0.95, "stdx: {:.1f}  avgx: {:.1f}  stdy: {:.1f}  avgy: {:.1f}".format(std_x, avg_x, std_y, avg_y), transform=plt.gca().transAxes, fontsize=12, verticalalignment='top')
+        
+        # self.xyz_fig = plt.figure(figsize=(10, 8))
+        # plt.subplot(2, 1, 1)
+        # sns.lineplot(x=range(len(self.x)), y=self.x, hue=self.user, palette=self.palette, legend="full", style=self.user)
+        # plt.title("X-Y")
+        # plt.ylabel("X")
+        # plt.legend(title="User")
+        # if len(set(self.user)) == 1:
+            # plt.text(0.05, 0.95, "std: {:.1f}  avg: {:.1f}".format(std_x, avg_x), transform=plt.gca().transAxes, fontsize=12, verticalalignment='top') 
+
+        # plt.subplot(2, 1, 2)
+        # sns.lineplot(x=range(len(self.y)), y=self.y, hue=self.user, palette=self.palette, legend="full", style= self.user)
+        # plt.xlabel("Index")
+        # plt.ylabel("Y")
+        # plt.legend(title="User")
+        # if len(set(self.user)) == 1:
+            # plt.text(0.05, 0.95, "std: {:.1f}  avg: {:.1f}".format(std_y, avg_y), transform=plt.gca().transAxes, fontsize=12, verticalalignment='top') 
 
         if plot_z:
             plt.figure(figsize=(8,6))
             sns.set_style("darkgrid")
             sns.set_context("notebook", font_scale=1.0, rc={"lines.linewidth": 1.5})
             sns.lineplot(x=range(len(self.z)), y=self.z, hue=self.user, palette=self.palette, legend="full")
+            plt.title("Trend Chart of Z")
             plt.xlabel("Index")
             plt.ylabel("Z")
             plt.legend(title="User")
@@ -99,12 +139,15 @@ class MultiPlotter:
             fig = g.fig
     
             fig.subplots_adjust(left=0.1, bottom=0.1, right=0.9, top=0.9)
+            plt.title("Z Distribution")
             plt.xlabel("Z")
+            if len(set(self.user)) == 1:
+                plt.text(0.05, 0.95, "std: {:.1f}  avg: {:.1f}".format(std_z, avg_z), transform=plt.gca().transAxes, fontsize=12, verticalalignment='top') 
 
         plt.show()
 
 
 if __name__ == '__main__':
-    data = [[0, 1, 1, 48, 42, 100, 0, 0, 0, -28], [1, 1, 1, 54, 52, 100, 0, 0, 0, -30], [2, 1, 1, 48, 34, 100, 0, 0, 0, -23], [3, 1, 1, 46, 35, 100, 0, 0, 0, -25], [4, 1, 1, 56, 38, 100, 0, 0, 0, -32], [5, 1, 1, 60, 41, 100, 0, 0, 0, -37], [6, 1, 1, 59, 43, 100, 0, 0, 0, -39], [7, 1, 1, 46, 38, 100, 0, 0, 0, -33], [8, 1, 1, 43, 36, 100, 0, 0, 0, -29], [9, 1, 1, 41, 38, 100, 0, 0, 0, -26], [10, 1, 1, 36, 35, 100, 0, 0, 0, -22], [11, 1, 1, 44, 32, 100, 0, 0, 0, -23], [12, 1, 1, 39, 35, 100, 0, 0, 0, -23], [13, 1, 1, 37, 41, 100, 0, 0, 0, -21], [14, 1, 1, 37, 40, 100, 0, 0, 0, -17], [15, 1, 1, 50, 42, 100, 0, 0, 0, -21], [16, 1, 1, 49, 41, 100, 0, 0, 0, -22], [17, 1, 1, 41, 46, 100, 0, 0, 0, -20], [18, 1, 1, 39, 40, 100, 0, 0, 0, -15], [19, 1, 1, 43, 39, 100, 0, 0, 0, -16], [20, 1, 1, 39, 41, 100, 0, 0, 0, -16], [21, 1, 1, 42, 45, 100, 0, 0, 0, -16], [22, 1, 1, 42, 45, 100, 0, 0, 0, -14], [23, 1, 1, 42, 43, 100, 0, 0, 0, -12], [24, 1, 1, 39, 39, 100, 0, 0, 0, -11], [25, 1, 1, 37, 44, 100, 0, 0, 0, -11], [31, 2, 1, 51, 38, 100, 0, 0, 0, -26], [32, 2, 1, 53, 41, 100, 0, 0, 0, -31], [26, 1, 1, 35, 40, 100, 0, 0, 0, -9], [27, 1, 1, 43, 43, 100, 0, 0, 0, -12], [28, 1, 1, 35, 44, 100, 0, 0, 0, -9], [29, 1, 1, 37, 44, 100, 0, 0, 0, -8], [30, 2, 0, 0, 37, 100, 0, 0, 0, 0], [33, 2, 1, 41, 39, 100, 0, 0, 0, -20], [34, 2, 1, 43, 38, 100, 0, 0, 0, -20], [35, 2, 1, 45, 36, 100, 0, 0, 0, -21], [36, 2, 1, 44, 35, 100, 0, 0, 0, -22], [37, 2, 1, 31, 38, 100, 0, 0, 0, -18], [38, 2, 1, 38, 44, 100, 0, 0, 0, -17], [39, 2, 1, 46, 46, 100, 0, 0, 0, -17], [40, 2, 1, 43, 46, 100, 0, 0, 0, -15], [41, 2, 1, 34, 40, 100, 0, 0, 0, -10], [42, 2, 1, 39, 40, 100, 0, 0, 0, -11], [43, 2, 1, 39, 43, 100, 0, 0, 0, -11], [44, 2, 1, 27, 45, 100, 0, 0, 0, -6], [45, 2, 1, 30, 39, 100, 0, 0, 0, -3], [46, 2, 1, 41, 38, 100, 0, 0, 0, -7], [47, 2, 1, 38, 37, 100, 0, 0, 0, -10], [48, 2, 1, 33, 38, 100, 0, 0, 0, -10], [49, 2, 1, 49, 30, 100, 0, 0, 0, -16], [50, 2, 1, 43, 34, 100, 0, 0, 0, -20], [51, 2, 1, 51, 30, 100, 0, 0, 0, -26], [52, 2, 1, 52, 31, 100, 0, 0, 0, -32], [53, 2, 1, 47, 33, 100, 0, 0, 0, -33], [54, 2, 1, 47, 43, 100, 0, 0, 0, -33], [55, 2, 1, 50, 41, 100, 0, 0, 0, -30], [56, 2, 1, 42, 44, 100, 0, 0, 0, -25], [57, 2, 1, 35, 45, 100, 0, 0, 0, -18], [58, 2, 1, 44, 48, 100, 0, 0, 0, -16]] 
+    data = [[0, 1, 1, 48, 42, 100, 0, 1, 2, -28], [1, 1, 1, 54, 52, 100, 0, 0, 0, -30], [2, 1, 1, 48, 34, 100, 0, 0, 0, -23], [3, 1, 1, 46, 35, 100, 0, 0, 0, -25], [4, 1, 1, 56, 38, 100, 0, 0, 0, -32], [5, 1, 1, 60, 41, 100, 0, 0, 0, -37], [6, 1, 1, 59, 43, 100, 0, 0, 0, -39], [7, 1, 1, 46, 38, 100, 0, 0, 0, -33], [8, 1, 1, 43, 36, 100, 0, 0, 0, -29], [9, 1, 1, 41, 38, 100, 0, 0, 0, -26], [10, 1, 1, 36, 35, 100, 0, 0, 0, -22], [11, 1, 1, 44, 32, 100, 0, 0, 0, -23], [12, 1, 1, 39, 35, 100, 0, 0, 0, -23], [13, 1, 1, 37, 41, 100, 0, 0, 0, -21], [14, 1, 1, 37, 40, 100, 0, 0, 0, -17], [15, 1, 1, 50, 42, 100, 0, 0, 0, -21], [16, 1, 1, 49, 41, 100, 0, 0, 0, -22], [17, 1, 1, 41, 46, 100, 0, 0, 0, -20], [18, 1, 1, 39, 40, 100, 0, 0, 0, -15], [19, 1, 1, 43, 39, 100, 0, 0, 0, -16], [20, 1, 1, 39, 41, 100, 0, 0, 0, -16], [21, 1, 1, 42, 45, 100, 0, 0, 0, -16], [22, 1, 1, 42, 45, 100, 0, 0, 0, -14], [23, 1, 1, 42, 43, 100, 0, 0, 0, -12], [24, 1, 1, 39, 39, 100, 0, 0, 0, -11], [25, 1, 1, 37, 44, 100, 0, 0, 0, -11], [31, 2, 1, 51, 38, 100, 0, 0, 0, -26], [32, 2, 1, 53, 41, 100, 0, 0, 0, -31], [26, 1, 1, 35, 40, 100, 0, 0, 0, -9], [27, 1, 1, 43, 43, 100, 0, 0, 0, -12], [28, 1, 1, 35, 44, 100, 0, 0, 0, -9], [29, 1, 1, 37, 44, 100, 0, 0, 0, -8], [30, 2, 0, 0, 37, 100, 0, 0, 0, 0], [33, 2, 1, 41, 39, 100, 0, 0, 0, -20], [34, 2, 1, 43, 38, 100, 0, 0, 0, -20], [35, 2, 1, 45, 36, 100, 0, 0, 0, -21], [36, 2, 1, 44, 35, 100, 0, 0, 0, -22], [37, 2, 1, 31, 38, 100, 0, 0, 0, -18], [38, 2, 1, 38, 44, 100, 0, 0, 0, -17], [39, 2, 1, 46, 46, 100, 0, 0, 0, -17], [40, 2, 1, 43, 46, 100, 0, 0, 0, -15], [41, 2, 1, 34, 40, 100, 0, 0, 0, -10], [42, 2, 1, 39, 40, 100, 0, 0, 0, -11], [43, 2, 1, 39, 43, 100, 0, 0, 0, -11], [44, 2, 1, 27, 45, 100, 0, 0, 0, -6], [45, 2, 1, 30, 39, 100, 0, 0, 0, -3], [46, 2, 1, 41, 38, 100, 0, 0, 0, -7], [47, 2, 1, 38, 37, 100, 0, 0, 0, -10], [48, 2, 1, 33, 38, 100, 0, 0, 0, -10], [49, 2, 1, 49, 30, 100, 0, 0, 0, -16], [50, 2, 1, 43, 34, 100, 0, 0, 0, -20], [51, 2, 1, 51, 30, 100, 0, 0, 0, -26], [52, 2, 1, 52, 31, 100, 0, 0, 0, -32], [53, 2, 1, 47, 33, 100, 0, 0, 0, -33], [54, 2, 1, 47, 43, 100, 0, 0, 0, -33], [55, 2, 1, 50, 41, 100, 0, 0, 0, -30], [56, 2, 1, 42, 44, 100, 0, 0, 0, -25], [57, 2, 1, 35, 45, 100, 0, 0, 0, -18], [58, 2, 1, 44, 48, 100, 0, 0, 0, -16]] 
     plotter = MultiPlotter(data)
-    fig = plotter.plot_speed()
+    fig = plotter.plot_xyz()
