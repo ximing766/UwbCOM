@@ -19,7 +19,7 @@ class SerialAssistant:
         self.progress_frame.pack(side="top", fill="x", padx=10, pady=10)
         
         self.progressbars = []
-        self.progressbar_scales = [[20, 60], [50, 150], [50, 150], [0, 20], [0, 20]]
+        self.progressbar_scales = [[20, 60], [30, 200], [30, 200], [0, 30], [0, 30]]
         self.progressbar_init_values = [30, 100, 100, 10, 10]
         self.labels = []
         self.label_names = ["Height  Diff ", "Max-D of M", "Max-D of S ", "Error of  M  ", "Error of  S  "]
@@ -39,7 +39,7 @@ class SerialAssistant:
         self.control_frame = customtkinter.CTkFrame(self.master, height=100, fg_color= ("#E6F7FF"))
         self.control_frame.pack(side="top", fill="both", expand=True, padx=10, pady=10)
 
-        self.output = customtkinter.CTkEntry(self.control_frame, width=80, height=10, fg_color= ("#D3EAF9"), font=("Roboto", 15))
+        self.output = customtkinter.CTkTextbox(self.control_frame, width=80, height=10, fg_color= ("#D3EAF9"), font=("Roboto", 15))
         self.output.pack(side="right", fill="both", expand=True, padx=10, pady=10)
         
         self.confirm_button = customtkinter.CTkButton(self.control_frame, text="Confirm", width=40, command=self.show_ZEE, fg_color= ("#A0C8CF"),  font=("Roboto", 15))
@@ -61,8 +61,11 @@ class SerialAssistant:
         ec_values = range(0,int(self.progressbars[4].get())+1)
         ez = [self.calculate_ez(h, b, c, eb, ec) for eb in eb_values for ec in ec_values]
         
-        self.output.delete(0, "end")
-        self.output.insert(tk.END, f"测量高度理论误差参考:[ {min(ez):.1f}, {max(ez):.1f}]\n")
+        self.output.delete(1.0, "end")
+        self.output.insert(tk.END, f"理论测量高度误差(参考值):\n[ {min(ez):.1f}, {max(ez):.1f}]")
+        self.output.see(tk.END)
+        
+
 
 
 customtkinter.set_appearance_mode("light")  # Modes: System (default), light, dark
