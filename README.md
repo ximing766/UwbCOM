@@ -18,7 +18,7 @@ uwbenv\Scripts\activate
 2：执行
 
 ```
-pyinstaller --noconsole --onefile -i UWBCOM.ico --add-data "UWBCOM.ico;." --name "UwbCOM_V1.4" UwbCOM.py
+pyinstaller --noconsole --onefile -i UWBCOM.ico --add-data "UWBCOM.ico;." --name "UwbCOM_V1.4.5" UwbCOM.py
 ```
 
 3：若失败，在生成的spec添加一行后执行4

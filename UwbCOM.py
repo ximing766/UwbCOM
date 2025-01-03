@@ -37,26 +37,26 @@ from Algorithm.location.Chan_lse import ChanALG_LSE
 from Algorithm.location.Chan_equation import ChanEALG
 
 class SerialAssistant:
-    def __init__(self, master):
+    def __init__(self, master, log):
         self.master = master
-
-        # self.config = configparser.ConfigParser()
-        # self.config.read('./config/init.ini')
-        # self.version = self.config['DEFAULT']['Version']
-        # self.Window = self.config['DEFAULT']['Window']
-
-        self.version = "V1.4.3"
+        self.log = log
+        self.version = "V1.4.5"
+        self.view = "default"                                 # view没创建为单独的类，这里只能共用一个再去区分了
         self.master.title("UwbCOM " + self.version)
-        self.master.minsize(850, 735)
+        self.master.minsize(850, 835)
         self.master.geometry("950x835")
         icon_path = os.path.join(os.path.dirname(__file__), 'UWBCOM.ico')
         self.master.wm_iconbitmap(icon_path)
         self.app_path = os.path.dirname(sys.executable)
-        self.log_dir = os.path.join(self.app_path, 'Logs')
-        print(self.log_dir)
-        if not os.path.exists(self.log_dir):
-            os.makedirs(self.log_dir)
+        print(f'App Path: {self.app_path}')
         
+        self.config = configparser.ConfigParser()
+        config_path = os.path.join(self.app_path, 'config/init.ini') 
+
+        if os.path.exists(config_path):
+            self.config.read(config_path)
+            if 'View' in self.config['DEFAULT']:
+                self.view = self.config['DEFAULT']['View']
 
         self.serial_open  = False
         self.serial_ports = []                          
@@ -109,8 +109,9 @@ class SerialAssistant:
 
         ## ** User Define ** ##
         #Emoji._ITEMS[i].name                               "🤨"
-        print(Emoji._ITEMS)
+        # print(Emoji._ITEMS)
         self.face                 = Emoji.get("winking face")
+        self.table_columns        = ('ID','User','nLos','D-Master','D-Slaver','D-Gate','Speed','x','y','z')
         self.PosInfo              = "@POSI"
         self.CardInfo             = "@CARD"
         self.pos_pattern          = re.compile(self.PosInfo)
@@ -142,10 +143,9 @@ class SerialAssistant:
         self.Use_KF               = False    
         self.Use_AOA              = False   
 
-        self.CallCount            = 0
         self.table_data           = []
         self.table_one_data       = 0
-        self.table_ten_data       = []
+        self.table_1s_data       = []
         self.table_IDX            = 0
         self.current_time         = 0
         self.last_call_time       = 0
@@ -154,7 +154,7 @@ class SerialAssistant:
         self.x_move               = 0
         self.y_move               = 0
 
-        self.create_widgets()
+        self.create_widgets(self.view)
 
         #实时更新串口选择框
         self.update_combobox_periodically()
@@ -177,21 +177,26 @@ class SerialAssistant:
         self.update_combobox()
         self.master.after(3000, self.update_combobox_periodically) 
 
+    def count_1s_data(func):
+        def wrapper(self, *args, **kwargs):
+            len_data = len(self.table_1s_data)
+            func(self, *args, **kwargs)
+            print("previous 1s data len:",len_data)
+        return wrapper
+    
+    @count_1s_data
     def update_Table(self):
-        self.distance_value = self.distance_entry.get()
-        # print("Distance value:", self.distance_value)
         if self.serial_open == True:
-            self.insert_data(self.table_ten_data)
+            self.insert_data(self.table_1s_data)
         self.master.after(1000, self.update_Table)
 
     def update_canvas(self):
         if self.serial_open == True:
-            # print("update users")
-            self.data_queue.put(self.distance_list)
+            self.data_queue.put(self.distance_list)   #TODO 这儿通过self.distance_list进行消抖，小幅移动不进行绘制
             self.draw_user_after()
         self.master.after(300, self.update_canvas)  # 继续安排下一次更新
 
-    def create_widgets(self):
+    def create_widgets(self, view = None):
         '''
         description: 串口设置区域
         
@@ -227,8 +232,10 @@ class SerialAssistant:
         self.serial_bt = ttk.Button(frame_settings, text="打开串口", command=self.open_serial, width=button_width,bootstyle="info")
         self.serial_bt.grid(row=0, column=2, padx=5, pady=5,sticky='nsew')
 
-        # self.modeCombo = ttk.Combobox(frame_settings,values=['GATE','LIFT','UL-TDOA','DL-TDOA'],width=button_width,bootstyle="info")
-        self.modeCombo = ttk.Combobox(frame_settings,values=['GATE'],width=button_width,bootstyle="info")
+        if view == "default":
+            self.modeCombo = ttk.Combobox(frame_settings,values=['GATE','LIFT','UL-TDOA','DL-TDOA'],width=button_width,bootstyle="info")
+        else:
+            self.modeCombo = ttk.Combobox(frame_settings,values=['GATE'],width=button_width,bootstyle="info")
         self.modeCombo.current(0)
         self.modeCombo.grid(row=1, column=2, padx=5, pady=5,sticky='nsew')
         self.modeCombo.bind("<<ComboboxSelected>>", self.on_mode_change)
@@ -248,17 +255,18 @@ class SerialAssistant:
         other_Button2   = ttk.Button(frame_settings, text="交易记录", command=lambda:self.send_data(44444), width=button_width,bootstyle="primary").grid(row=1, column=6, padx=5, pady=5,sticky='nsew')
         self.text_area4 = ttk.Entry(frame_settings,width=entry_width,bootstyle="info")
         self.text_area4.grid(row=1, column=5, padx=5, pady=5, sticky='nsew')
-
-        image_path = self.resource_path('logo.png')
-        self.image = Image.open(image_path)
-        self.image.thumbnail((100, 30))
-        self.photo = ImageTk.PhotoImage(self.image)
-        self.label = ttk.Label(frame_settings, image=self.photo)
-        self.label.grid(row=0, column=7, columnspan=2,rowspan=1, padx=5, pady=5,sticky='nsew')
-        self.label.image = self.photo
-
-        self.txt_label = ttk.Label(frame_settings, text="仅授权小米内部使用",font=("Arial", 8),bootstyle="dark")
-        self.txt_label.grid(row=1, column=7, columnspan=2,rowspan=1, padx=5, pady=5,sticky='nsew')
+        
+        if view != "default":        
+            image_path = self.resource_path('logo.png')
+            self.image = Image.open(image_path)
+            self.image.thumbnail((100, 30))
+            self.photo = ImageTk.PhotoImage(self.image)
+            self.label = ttk.Label(frame_settings, image=self.photo)
+            self.label.grid(row=0, column=7, columnspan=2,rowspan=1, padx=5, pady=5,sticky='nsew')
+            self.label.image = self.photo
+            txt_label = "仅授权小米内部使用" if view == 'xiaomi' else "xxxxxx"
+            self.txt_label = ttk.Label(frame_settings, text=txt_label,font=("Arial", 8),bootstyle="dark")
+            self.txt_label.grid(row=1, column=7, columnspan=2,rowspan=1, padx=5, pady=5,sticky='nsew')
         
         '''
         description: 通信区域
@@ -277,12 +285,12 @@ class SerialAssistant:
         frame_comm_L.grid(row=0, column=0, padx=1, pady=1,sticky='nsew')
         frame_comm_L.grid_rowconfigure(0,weight=1)
         frame_comm_L.grid_columnconfigure(0, weight=1)
-        table_columns = ('ID','User','nLos','D-Master','D-Slaver','D-Gate','Speed','x','y','z')
-        self.Table = ttk.Treeview(frame_comm_L, columns=table_columns,show='headings',bootstyle="info")
+        
+        self.Table = ttk.Treeview(frame_comm_L, columns=self.table_columns,show='headings',bootstyle="info")
         self.Table.tag_configure('oddrow', background='#ECECEC')
         self.Table.tag_configure('evenrow', background='#FFFFFF')
 
-        for col in table_columns:
+        for col in self.table_columns:
             self.Table.heading(col, text=col, anchor='w')
         self.SetTableColumns()
         self.Table.grid(row=0, column=0, padx=1, pady=1,sticky='nsew')
@@ -299,12 +307,15 @@ class SerialAssistant:
         frame_comm_R_Top        = ttk.Frame(frame_comm_R,width=300,height=frame_comm_R_Top_height)
         frame_comm_R_Top.grid(row=0, column=0, padx=1, pady=1,sticky='nsew')
         frame_comm_R_Top.grid_rowconfigure(0,weight=1)
+        frame_comm_R_Top.grid_rowconfigure(1,weight=1)
         frame_comm_R_Top.grid_columnconfigure(0, weight=1)   
+        frame_comm_R_Top.grid_columnconfigure(1, weight=1)
+        frame_comm_R_Top.grid_columnconfigure(2, weight=1)
 
-        clear_bt = ttk.Button(frame_comm_R_Top, text="清除", command=lambda:self.on_clearAndSave_text(1),width=5,bootstyle="success-outline-toolbutton")
+        clear_bt = ttk.Button(frame_comm_R_Top, text="清除", command=lambda:self.on_ClearWindow(),bootstyle="success-outline")
         clear_bt.grid(row=0, column=0, padx=1, pady=3,sticky='ew')
         
-        save_bt = ttk.Button(frame_comm_R_Top, text="保存", command=lambda:self.on_clearAndSave_text(2),width=5,bootstyle="success-outline-toolbutton")
+        save_bt = ttk.Button(frame_comm_R_Top, text="...", bootstyle="success-outline", state="disabled")
         save_bt.grid(row=1, column=0, padx=1, pady=3,sticky='ew')
 
         Check_bt1 = ttk.Button(frame_comm_R_Top, text="Distance", command=lambda:self.on_checkbutton_click_distance(), bootstyle="success-outline")
@@ -316,10 +327,8 @@ class SerialAssistant:
         Check_bt3 = ttk.Button(frame_comm_R_Top, text="X-Y-Z", command=lambda:self.on_checkbutton_click_xyz(), bootstyle="success-outline")
         Check_bt3.grid(row=0, column=2, padx=1, pady=3,sticky='ew')
 
-        # Check_bt4 = ttk.Button(frame_comm_R_Top, text="...", command=lambda:self.on_checkbutton_click_xyz(), bootstyle="success-outline",state="disabled")
-        # Check_bt4.grid(row=1, column=2, padx=1, pady=3,sticky='ew')
-        self.distance_entry = ttk.Entry(frame_comm_R_Top, bootstyle="info")
-        self.distance_entry.grid(row=1, column=2, padx=1, pady=3,sticky='ew')
+        Check_bt4 = ttk.Button(frame_comm_R_Top, text="...", command=lambda:self.on_checkbutton_click_xyz(), bootstyle="success-outline",state="disabled")
+        Check_bt4.grid(row=1, column=2, padx=1, pady=3,sticky='ew')
 
         # 子总框下侧功能框(更具进度条的值，更新演示图中电梯的高度和深度,半径)
         frame_comm_R_Bottom = ttk.LabelFrame(frame_comm_R, width=300, height=15,text="demonstration",bootstyle="info")
@@ -386,13 +395,14 @@ class SerialAssistant:
         progressbar3.bind("<Motion>", update_progressbar3_value)
         progressbar3.bind("<ButtonRelease-1>", update_progressbar3_value)
 
-        animation_button1 = ttk.Button(frame_comm_R_Bottom, text="demoA", command=self.run_UWB_Lift_Animation_plan_1, width=5,bootstyle="info",state="disable")
+        ani_state = "enabled" if view == "default" else "disabled"
+        animation_button1 = ttk.Button(frame_comm_R_Bottom, text="demoA", command=self.run_UWB_Lift_Animation_plan_1, width=5,bootstyle="info",state=ani_state)
         animation_button1.grid(row=0, column=2, padx=1, pady=0,sticky='nsew')
         
-        animation_button2 = ttk.Button(frame_comm_R_Bottom, text="demoB", command=self.run_UWB_Lift_Animation_plan_2, width=5,bootstyle="info",state="disable")
+        animation_button2 = ttk.Button(frame_comm_R_Bottom, text="demoB", command=self.run_UWB_Lift_Animation_plan_2, width=5,bootstyle="info",state=ani_state)
         animation_button2.grid(row=1, column=2, padx=1, pady=1,sticky='nsew')
 
-        animation_button2 = ttk.Button(frame_comm_R_Bottom, text="...", command=self.run_UWB_Lift_Animation_plan_2, width=5,bootstyle="info",state="disable")
+        animation_button2 = ttk.Button(frame_comm_R_Bottom, text="...", command=self.run_UWB_Lift_Animation_plan_2, width=5,bootstyle="info",state=ani_state)
         animation_button2.grid(row=2, column=2, padx=1, pady=1,sticky='nsew')
 
         '''
@@ -415,9 +425,6 @@ class SerialAssistant:
 
         self.canvas = tk.Canvas(self.canvas_frame,bg="white",height=390)
         self.canvas.grid(row=0, column=0, padx=5, pady=5,sticky='nsew')
-
-        #绘制画布边界
-        #self.canvas.create_rectangle(0+2,0+2, 800-1, 400-1, width=1, outline="black")
         self.master.grid_columnconfigure(0, weight=1)
 
         '''
@@ -444,7 +451,7 @@ class SerialAssistant:
             self.table_data.append(row_list)
 
         self.table_scroll()
-        self.table_ten_data = []
+        self.table_1s_data = []
     
     def SetTableColumns(self):
         self.Table.column('ID',width=50, anchor='w')
@@ -472,39 +479,12 @@ class SerialAssistant:
         self.table_IDX = 0
         self.table_data = []
 
-    def on_clearAndSave_text(self,flag):
-        if flag == 1:
-            self.clear_table()
-            self.text_area1.delete(0,tk.END)
-            self.text_area2.delete(0,tk.END)
-            self.text_area3.delete(0,tk.END)
-            self.text_area4.delete(0,tk.END)
-        elif flag == 2:
-            try:
-                self.log_file_path = os.path.join(self.log_dir, f'UWBCOM_Data_{time.strftime("%Y%m%d%H%M%S")}.csv')
-                logger = logging.getLogger('UWBLogger')
-                logger.setLevel(logging.INFO)
-                file_handler = logging.FileHandler(self.log_file_path)
-                # file_handler.setLevel(logging.INFO)
-                # log_format = logging.Formatter('%(asctime)s , %(levelname)s , %(message)s')
-                log_format = logging.Formatter('%(message)s')
-                file_handler.setFormatter(log_format)
-                logger.addHandler(file_handler)
-
-                columns = self.Table["columns"]
-                column_names = [self.Table.heading(column)['text'] for column in columns]
-                columns_str = ', '.join(column_names)
-                logger.info(columns_str)
-                for row_id in self.Table.get_children():
-                    row = self.Table.item(row_id)['values']
-                    row_str = ', '.join(map(str, row))
-                    logger.info(row_str)
-
-                messagebox.showinfo("tips",f"save file success : ./Logs/UWBCOM_Data.csv")
-                logger.removeHandler(file_handler)
-                file_handler.close()
-            except Exception as e:
-                messagebox.showerror("tips","save file failed:{}".format(e))    
+    def on_ClearWindow(self):
+        self.clear_table()
+        self.text_area1.delete(0,tk.END)
+        self.text_area2.delete(0,tk.END)
+        self.text_area3.delete(0,tk.END)
+        self.text_area4.delete(0,tk.END)  
     
     def on_checkbutton_click_distance(self):
         self.plotter1 = MultiPlotter(self.table_data)
@@ -520,47 +500,22 @@ class SerialAssistant:
         self.plotter3 = MultiPlotter(self.table_data)
         self.plotter3.plot_xyz(self.Use_AOA)
 
-
     def send_data(self,flag):
         self.flag_str = str(flag)
         self.serial.write(self.flag_str.encode())
         
-    def show_cardData(self,data):
+    def show_cardData(self,data):    
         data = data.strip()
-        if self.flag_str == "11111":
-            cardNumber = data[210:320][:20]
-            #self.text_area1.delete(tk.END)
-            self.text_area1.delete(0, tk.END)
-            self.text_area1.insert(tk.END, cardNumber)     
-            self.flag_str = ""
-            
-        elif self.flag_str == "22222":
-            validPeriod = data[210:320][20:36]
-            self.text_area2.delete('1.0', tk.END)
-            self.text_area2.insert(tk.END, validPeriod)     
-            self.flag_str = ""
-            
-        elif self.flag_str == "33333":
-            balance = round(data[210:320][48:52],16)
-            self.text_area3.delete('1.0', tk.END)
-            self.text_area3.insert(tk.END, str(balance / 100))         
-            self.flag_str = ""
-            
-        elif self.flag_str == "44444":
-            transactionRecord = data[210:320][92:106]
-            self.text_area4.delete('1.0', tk.END)
-            self.text_area4.insert(tk.END, transactionRecord)       
-            self.flag_str = ""
-        
-        else:   
+        try:
             json_data = json.loads(data)
             cardNumber = json_data['CardNumber']
             self.text_area1.delete(0, tk.END)
             self.text_area1.insert(tk.END, cardNumber)    
             balance = json_data['Balance']
             self.text_area3.delete(0, tk.END)
-            self.text_area3.insert(tk.END, str(balance / 100) + '￥')        
-
+            self.text_area3.insert(tk.END, str(balance / 100) + '￥') 
+        except json.JSONDecodeError as e:
+            messagebox.showerror("JSON decode error:", e)       
         
     def change_filter(self,flag):
         self.Use_KF = flag
@@ -576,13 +531,14 @@ class SerialAssistant:
             self.data_queue  = queue.Queue()
             self.read_thread = threading.Thread(target=self.read_data)
             self.read_thread.start()
-            # self.draw_thread = threading.Thread(target=self.draw_data)
-            # self.draw_thread.start()
             
             self.serial_open = True
             self.update_canvas()
             self.update_Table()
             self.update_serial_button()
+            self.log.add_filehandler()
+            self.log.info(', '.join(self.table_columns))
+            self.log_number = 0
 
         except Exception as e:
             messagebox.showerror("tips","open uart failed:{}".format(e))    
@@ -592,15 +548,14 @@ class SerialAssistant:
             if self.serial: 
                 self.serial.close()
                 # self.read_thread.join()
-                # self.draw_thread.join()
                 # messagebox.showinfo("tips","Uart has been closed" )
-
-                self.canvas.delete("all")       
-                self.Master2SlverDistance = 0   
+                self.Master2SlverDistance = 0    #保证重绘basic
                 self.serial_open          = False
                 self.update_serial_button()
+                self.canvas.delete("all")
+                self.log.remove_filehandler()
         except Exception as e:
-            messagebox.showerror("tips","close uart failed:{}".format(e))
+            messagebox.showerror("tips","Close uart failed:{}".format(e))
     
     def UL_read_data(self,port,baudrate,queue):
         ser = serial.Serial(port, baudrate, timeout=1)
@@ -616,13 +571,6 @@ class SerialAssistant:
     
     def read_data(self):
         while self.serial and self.serial.is_open:
-            # self.current_time = time.time()
-            # if self.last_call_time is None:
-            #     self.last_call_time = self.current_time
-            # elif self.current_time - self.last_call_time >= 1:
-            #     print(f"@ Location has been updated {self.CallCount} times in the last second.")
-            #     self.CallCount = 0 
-            #     self.last_call_time = self.current_time
             try:
                 if (data := self.serial.readline()):
                     data = data.decode('utf-8',errors='replace')
@@ -678,15 +626,12 @@ class SerialAssistant:
 
                         self.table_one_data = (idx, self.distance_list[idx]['nLos'], self.distance_list[idx]['MasterDistance'], self.distance_list[idx]['SlaverDistance'], \
                                            self.distance_list[idx]['GateDistance'], json_data['Speed'], data_x, int(self.y-60), int(self.z))
-                        self.table_ten_data.append(self.table_one_data)
-                        # self.table_IDX += 1
-                        # if len(self.table_ten_data) == 20:
-                        #     self.insert_data(self.table_ten_data)
-                        # self.table_data.append(list(self.table_one_data))
+                        self.table_1s_data.append(self.table_one_data)
+                        log_data = (self.log_number,) + self.table_one_data
+                        self.log.info(', '.join(map(str, log_data)))
+                        self.log_number += 1
 
-                        # print("Use_KF:",self.Use_KF)
-                        if self.Use_KF == True:
-                            # self.CallCount += 1
+                        if self.Use_KF == True:  
                             self.cor = [self.x,self.y]
                             user_kf  = self.distance_list[idx]['KF']
                             z        = np.matrix(self.cor).T
@@ -708,7 +653,6 @@ class SerialAssistant:
                                 if len(self.distance_list[idx]['CoorX_Arr']) < 20:
                                     print('Z-Socre reduce some data,return.',len(self.distance_list[idx]['CoorX_Arr']))
                                 else:
-                                    # self.CallCount += 1
                                     #19
                                     self.distance_list[idx]['CoorX_Arr'] = self.moving_average(self.distance_list[idx]['CoorX_Arr'],2).astype(int)
                                     self.distance_list[idx]['CoorY_Arr'] = self.moving_average(self.distance_list[idx]['CoorY_Arr'],2).astype(int)
@@ -741,7 +685,6 @@ class SerialAssistant:
         if self.serial_open:
             try:
                 data = self.data_queue.get_nowait()
-                # print("tips","queue get data")
                 if self.Use_KF:
                     self.draw_user_KF(data[0], data[1])
                 else:
@@ -796,8 +739,6 @@ class SerialAssistant:
             canvas.after(10, self.move_user, canvas, data)
         else:
             self.move_times = 0
-            
-
 
     '''
     description: 
@@ -850,7 +791,8 @@ class SerialAssistant:
                 self.canvas.delete("nLos")
         else:
             # messagebox.showinfo("tips", "blue not exist")
-            print("basic graphics  not exist")
+            print("No User data, Basic graphics  not exist")
+            return
 
         #用户创建和文本更新
         data = self.data_queue.get_nowait()
@@ -1091,8 +1033,6 @@ class SerialAssistant:
         TDOA_MA_S2 *= c
 
         return [TDOA_MA_S1,TDOA_MA_S2]
-
-          
     
     def open_coordinate_settings(self):
         settings_window = tk.Toplevel()  
@@ -1230,10 +1170,11 @@ class SerialAssistant:
 
 def main():
     root   = tk.Tk()
+    log = Log("UwbCOM")
     themes = ['cosmo', 'flatly', 'litera', 'minty', 'lumen', 'sandstone', 'yeti', 'pulse', 'united', 'morph', 'journal', 'darkly', 'superhero', \
               'solar', 'cyborg', 'vapor', 'simplex', 'cerculean']
     style = ttk.Style("minty")
-    app   = SerialAssistant(root)
+    app   = SerialAssistant(root, log)
     print(style.theme_names())
     def change_theme(theme_name):
         style.theme_use(theme_name)
@@ -1249,17 +1190,76 @@ def main():
     about_menu = tk.Menu(menubar, tearoff=0)
     menubar.add_cascade(label="关于", menu=about_menu)
     about_menu.add_command(label = "关于", command=app.show_about)
-    # about_menu.add_command(label = "更新", command=app.update_app)
+    if app.view == "default":
+        about_menu.add_command(label = "更新", command=app.update_app)
 
-    # source_menu = tk.Menu(menubar, tearoff=0)
-    # menubar.add_cascade(label="Source", command=lambda: webbrowser.open("https://github.com/ximing766/UwbCOM"))
+        # source_menu = tk.Menu(menubar, tearoff=0)
+        # menubar.add_cascade(label="Source", command=lambda: webbrowser.open("https://github.com/ximing766/UwbCOM"))
 
-    # filter_menu = tk.Menu(menubar, tearoff=0)
-    # menubar.add_cascade(label="滤波", menu=filter_menu)
-    # kalman_filter_menu = filter_menu.add_command(label="Kalman-Filter", command=lambda:app.change_filter(True))
-    # elasticnet_filter_menu = filter_menu.add_command(label="ElasticNet", command=lambda:app.change_filter(False))
+        filter_menu = tk.Menu(menubar, tearoff=0)
+        menubar.add_cascade(label="滤波", menu=filter_menu)
+        filter_menu.add_command(label="Kalman-Filter", command=lambda:app.change_filter(True))
+        filter_menu.add_command(label="ElasticNet", command=lambda:app.change_filter(False))
     
     root.mainloop()
+
+
+class Log:
+    def __init__(self,name,level=logging.INFO):
+        self.logger = logging.getLogger(name)
+        self.logger.setLevel(level)
+        self.log_queue = queue.Queue()
+        self.thread = threading.Thread(target=self.log_handler)
+        self.thread.daemon = True
+        self.thread.start()
+
+        self.root_path = os.path.dirname(sys.executable)
+        self.log_dir = os.path.join(self.root_path,'UwbCOMLog')
+        if not os.path.exists(self.log_dir):
+            os.makedirs(self.log_dir)
+
+        # self.add_filehandler()
+
+    def add_filehandler(self):
+        self.log_file_path = os.path.join(self.log_dir, f'UwbCOM_Log_{time.strftime("%Y-%m-%d-%H-%M-%S")}.csv')
+        self.file_handler = logging.FileHandler(self.log_file_path)
+        self.log_format = logging.Formatter('%(asctime)s , %(levelname)s , %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
+        self.file_handler.setFormatter(self.log_format)
+        self.logger.addHandler(self.file_handler)
+    
+    def remove_filehandler(self):
+        self.logger.removeHandler(self.file_handler)
+        self.file_handler.close()
+    
+    def log_handler(self):
+        while True:
+            try:
+                level, msg = self.log_queue.get()
+                if msg is None:
+                    break
+                if level == 'info':
+                    self.logger.info(msg)
+                elif level == 'warning':
+                    self.logger.warning(msg)
+                elif level == 'error':
+                    self.logger.error(msg)
+                elif level == 'debug':
+                    self.logger.debug(msg)
+                
+            except queue.Empty:
+                pass
+
+    def info(self, msg):
+        self.log_queue.put(('info', msg))
+
+    def warning(self, msg):
+        self.log_queue.put(('warning', msg))
+
+    def error(self, msg):
+        self.log_queue.put(('error', msg))
+    
+    def debug(self, msg):
+        self.log_queue.put(('debug', msg))
 
 if __name__ == "__main__":
     warnings.filterwarnings("ignore")

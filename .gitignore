@@ -1,5 +1,7 @@
 /dist
+/output
+/temp
 /build
 /UwbCOM_*.spec
-/app
-/Mesh/pyecharts-gallery
+
+
