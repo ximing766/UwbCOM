@@ -8,7 +8,7 @@ import ttkbootstrap as ttk
 class SerialAssistant:
     def __init__(self, master):
         self.master = master
-        self.master.title("UWB测量高度误差估计器")
+        self.master.title("UWB-高度误差估计器")
         self.master.minsize(400, 350)
         self.master.geometry("400x350")
         
@@ -19,10 +19,10 @@ class SerialAssistant:
         self.progress_frame.pack(side="top", fill="x", padx=10, pady=10)
         
         self.progressbars = []
-        self.progressbar_scales = [[20, 60], [30, 200], [30, 200], [0, 30], [0, 30]]
-        self.progressbar_init_values = [30, 100, 100, 10, 10]
+        self.progressbar_scales = [[20, 60], [30, 300], [30, 300], [0, 33], [0, 33]]
+        self.progressbar_init_values = [30, 100, 100, 5, 10]
         self.labels = []
-        self.label_names = ["Height  Diff ", "Max-D of M", "Max-D of S ", "Error of  M  ", "Error of  S  "]
+        self.label_names = ["Height  Diff ", "Distance-M", "Distance-S", "Error of M", "Error of S"]
         for i in range(5):
             container = customtkinter.CTkFrame(self.progress_frame, fg_color= ("#D3EAF9"))
             container.pack(side="top", padx=5, pady=5, fill="x")

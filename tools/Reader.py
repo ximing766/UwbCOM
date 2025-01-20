@@ -1,5 +1,4 @@
 import tkinter as tk
-from tkinter import scrolledtext
 import serial
 import serial.tools.list_ports
 import threading
@@ -7,6 +6,9 @@ import ttkbootstrap as ttk
 import customtkinter
 import ctypes
 import time
+import sys
+sys.path.append("E:/Work/UWB/Code/UwbCOMCode")
+from Algorithm.Ecb_Des import MyEcbDes
 
 class SerialAssistant:
     def __init__(self, master):
@@ -18,32 +20,36 @@ class SerialAssistant:
         self.my_lib.initialize_ecc()
         self.my_lib.encode_data.argtypes = [ctypes.POINTER(ctypes.c_ubyte), ctypes.c_int, ctypes.POINTER(ctypes.c_ubyte)]
         self.my_lib.encode_data.restype = None
+        self.Use_RSCode  = False
 
         self.serial = None
         self.is_running = False
         
-        # self.read_data_res = "0000FFA70005FFFFFFFFFF06FFFFFFFFFF28C20211805003020B01000000010409000100010F8580DC12D08027127D010100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000001901023B7227000000000000000000000000000000000000000000001700778AB54891E0D22DF4AE"                      
-        # self.write_data_res = "0000FF250005FFFFFFFFFF06FFFFFFFFFF2AC20115805401000F0000000120240821185844B2568CE5087600FFF6DBA8F9B8CBEBB13A"
-        # self.halt_data_res =  "0000FF100005FFFFFFFFFF06FFFFFFFFFF44CA0000F100F5D4543F960BEFB499F1"
-
-        self.read_data_res = bytes([0x00,0x00,0xFF,0xA7,0x00,0x05,0xFF,0xFF,0xFF,0xFF,0xFF,0x06,0xFF,0xFF,0xFF,0xFF,0xFF,0x28,0xC2,0x02,0x11,0x80,0x50,0x03,0x02,0x0B,
-                                    0x01,0x00,0x00,0x00,0x01,0x04,0x09,0x00,0x01,0x00,0x01,0x0F,0x85,0x80,0xDC,0x12,0xD0,0x80,0x27,0x12,0x7D,0x01,0x01,0x00,0x00,0x00,
-                                    0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
-                                    0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
-                                    0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
-                                    0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x19,0x01,0x02,0x3B,0x72,0x27,0x00,0x00,0x00,0x00,0x00,0x00,
-                                    0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x17,0x00])
-        self.write_data_res = bytes([0x00,0x00,0xFF,0x25,0x00,0x05,0xFF,0xFF,0xFF,0xFF,0xFF,0x06,0xFF,0xFF,0xFF,0xFF,0xFF,0x2A,0xC2,0x01,0x15,0x80,0x54,0x01,0x00,0x0F,
-                                     0x00,0x00,0x00,0x01,0x20,0x24,0x08,0x21,0x18,0x58,0x44,0xB2,0x56,0x8C,0xE5,0x08,0x76,0x00])
-        self.halt_data_res =  bytes([0x00, 0x00, 0xFF, 0x10, 0x00, 0x05, 0xFF, 0xFF, 0xFF, 0xFF,0xFF, 0x06, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0x44, 0xCA, 0x00, 0x00, 0xF1, 0x00])
-        self.read_data_res = self.RS_Encode(self.read_data_res)
-        self.write_data_res = self.RS_Encode(self.write_data_res)
-        self.halt_data_res = self.RS_Encode(self.halt_data_res)
-
-        old_part = self.read_data_res[-29:-23]
-        new_part = "010203"
-        self.read_data_res = self.read_data_res[:-29] + new_part + self.read_data_res[-23:]
-        print(f'read_data_res: {self.read_data_res}')
+        self.read_data_res = "0000FFA70005FFFFFFFFFF06FFFFFFFFFF28C20211805003020B01000000010409000100010F8580DC12D08027127D010100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000001901023B7227000000000000000000000000000000000000000000001700"                      
+        self.write_data_res = "0000FF250005FFFFFFFFFF06FFFFFFFFFF2AC20115805401000F0000000120240821185844B2568CE5087600"
+        self.halt_data_res =  "0000FF100005FFFFFFFFFF06FFFFFFFFFF44CA0000F100"
+        
+        if self.Use_RSCode:
+            self.read_data_res = bytes([0x00,0x00,0xFF,0xA7,0x00,0x05,0xFF,0xFF,0xFF,0xFF,0xFF,0x06,0xFF,0xFF,0xFF,0xFF,0xFF,0x28,0xC2,0x02,0x11,0x80,0x50,0x03,0x02,0x0B,
+                                        0x01,0x00,0x00,0x00,0x01,0x04,0x09,0x00,0x01,0x00,0x01,0x0F,0x85,0x80,0xDC,0x12,0xD0,0x80,0x27,0x12,0x7D,0x01,0x01,0x00,0x00,0x00,
+                                        0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
+                                        0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
+                                        0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
+                                        0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x19,0x01,0x02,0x3B,0x72,0x27,0x00,0x00,0x00,0x00,0x00,0x00,
+                                        0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x17,0x00])
+            self.write_data_res = bytes([0x00,0x00,0xFF,0x25,0x00,0x05,0xFF,0xFF,0xFF,0xFF,0xFF,0x06,0xFF,0xFF,0xFF,0xFF,0xFF,0x2A,0xC2,0x01,0x15,0x80,0x54,0x01,0x00,0x0F,
+                                        0x00,0x00,0x00,0x01,0x20,0x24,0x08,0x21,0x18,0x58,0x44,0xB2,0x56,0x8C,0xE5,0x08,0x76,0x00])
+            self.halt_data_res =  bytes([0x00, 0x00, 0xFF, 0x10, 0x00, 0x05, 0xFF, 0xFF, 0xFF, 0xFF,0xFF, 0x06, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0x44, 0xCA, 0x00, 0x00, 0xF1, 0x00])
+            
+            # 添加RS编码
+            self.read_data_res = self.RS_Encode(self.read_data_res)
+            self.write_data_res = self.RS_Encode(self.write_data_res)
+            self.halt_data_res = self.RS_Encode(self.halt_data_res)
+            
+            # 加入误差
+            error = "010203"
+            self.read_data_res = self.read_data_res[:-29] + error + self.read_data_res[-23:]    
+            print(f'read_data_res: {self.read_data_res}')
 
 
         self.flag = 0
@@ -124,7 +130,7 @@ class SerialAssistant:
     def connect(self):
         try:
             if self.port_var.get():
-                self.serial = serial.Serial(self.port_var.get(), self.baudrate_var.get(), timeout=0.05)   # reader 50ms返回
+                self.serial = serial.Serial(self.port_var.get(), self.baudrate_var.get(), timeout=0.03)   # reader 30ms返回
                 self.is_running = True
                 # self.connect_button.configure(state=tk.DISABLED)
                 # self.disconnect_button.configure(state=tk.ACTIVE)
@@ -150,31 +156,20 @@ class SerialAssistant:
     def Apdu_Handle(self, data, sequence):
         data_upper = data.upper()
         sequence_upper = sequence.upper()
-        # 使用find方法查找sequence_upper在data_upper中的下标
         index = data_upper.find(sequence_upper)
+        command = data_upper[index+26:index+28]
         if index != -1:
-            
-            # print(f"Sequence found at index: {index}")
-            print(data_upper[index+26:index+28])
-            # print(f"self.flag = {self.flag}")
-            if data_upper[index+26:index+28] == 'C9':    # send 8050,80dc
+            if command == 'C9':    # send 8050,80dc
                 self.show_in_text_area(f"接收读卡:\n{data}")
-                self.send_data(self.read_data_res,1)
-                self.current_time = time.time()
-                print(f"Send Read data time={self.current_time} \n")        
+                self.send_data(self.read_data_res,1)    
                 self.flag = 1
-            elif data_upper[index+26:index+28] == 'C3' and self.flag == 1:   #send 8054
+            elif command == 'C3' and self.flag == 1:   #send 8054
                 self.show_in_text_area(f"接收8050-80DC返回:\n{data}")
-                print(data_upper[index:index+30])
                 self.send_data(self.write_data_res,2)
-                self.current_time = time.time()
-                print(f"Send 8050 data time={self.current_time} \n")
                 self.flag += 1
-            elif data_upper[index+26:index+28] == 'C3' and self.flag == 2:   #send halt
+            elif command == 'C3' and self.flag == 2:   #send halt
                 self.show_in_text_area(f"接收8054返回:\n{data}")
                 self.send_data(self.halt_data_res,3)
-                self.current_time = time.time()
-                print(f"Send 8054 data time={self.current_time} \n")
                 self.flag = 0
         else:
             print("Sequence not found")
@@ -182,24 +177,18 @@ class SerialAssistant:
         while self.is_running and self.serial:
             try:
                 if data := self.serial.readline():
-                    self.current_time = time.time()
-                    print(f"Read Data time={self.current_time}")
                     self.Apdu_Handle(data.hex(), self.sequence)
                     
             except Exception as e:
                 self.show_in_text_area(f"Read data failed!!!: {e}")
 
-    def send_data(self, hex_data,type):
-        if hex_data is None:
-            hex_data = self.data_entry.get()
+    def send_data(self, hex_data, type):
         try:
             if len(hex_data) % 2 != 0:
                 self.show_in_text_area("Error:16进制数据长度应为偶数")
                 return
 
-            # 将16进制字符串转换为字节
             byte_data = bytes.fromhex(hex_data)
-
             if self.serial and self.serial.is_open:
                 self.serial.write(byte_data)
                 if type == 1:
