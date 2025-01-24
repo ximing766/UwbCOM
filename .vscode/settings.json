@@ -56,5 +56,6 @@
   "C_Cpp_Runner.showCompilationTime": false,
   "C_Cpp_Runner.useLinkTimeOptimization": false,
   "C_Cpp_Runner.msvcSecureNoWarnings": false,
-  "livePreview.defaultPreviewPath": "/boxplot_base.html"
+  "livePreview.defaultPreviewPath": "/boxplot_base.html",
+  "Codegeex.RepoIndex": true
 }

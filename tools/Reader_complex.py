@@ -33,8 +33,8 @@ class UwbReaderAssistant:
 
         self.defaultKey = bytes.fromhex("32D464AC81F1640A687D023BF99E35DF")
         self.posId      = "040900010001"
-        self.EnterMoney = "00000002"     #FIXME 两次交易的金额必须相同
-        self.ExitMoney = "00000002"
+        self.EnterMoney = "00000000"     #FIXME 两次交易的金额必须相同
+        self.ExitMoney = "00000001"
         self.EnterEP = "03"
         self.ExitEP = "04"
         self.IndustryCode = "04"
@@ -53,18 +53,14 @@ class UwbReaderAssistant:
         self.Exit_macdata = self.ExitMoney + "09" + self.posId + self.DateTime + "80" + "0000000000"
         self.Exit_macdata = bytes.fromhex(self.Exit_macdata)
                           
-        # self.enter_read_data_res = "05FFFFFFFFFF06FFFFFFFFFF2AC20311805003020B01" + self.EnterMoney + self.posId + "0F"+"8580DC12D08027127D010100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000001901023B722700000000000000000000000000000000000000000000" + \
-        #                             "3580DC00F030" + self.EnterEP + "0000" + "000279001102" + self.IndustryCode + self.Line+self.Site + "000015" + self.EnterMoney + self.balance + self.DateTime + "584012215840FFFFFFFF000000000000"
-        
         self.enter_read_data_res = "05FFFFFFFFFF06FFFFFFFFFF2AC20211805003020B01" + self.EnterMoney + self.posId + "0F"+ "3580DC00F030" + self.EnterEP + "0000" + self.posId \
-                                    + self.IndustryCode + self.Line+self.Site + "000015" + "00000000" + self.balance + self.DateTime + "584012215840FFFFFFFF000000000000"
+                                    + self.IndustryCode + self.Line+self.Site + "000015" + self.EnterMoney + self.balance + self.DateTime + "584012215840FFFFFFFF000000000000"
         self.dcs = self.calculate_DCS(self.enter_read_data_res)
-        # self.enter_read_data_res = "0000FFDD00" + self.enter_read_data_res + self.dcs + "00"
         self.enter_read_data_res = "0000FF5700" + self.enter_read_data_res + self.dcs + "00"   #XXX 长度57为self.enter_read_data_res的长度
         self.enter_write_data_res = "05FFFFFFFFFF06FFFFFFFFFF17C20115805401000F00000001"+self.DateTime  #+self.MAC+"08"+"F500"
        
         self.exit_read_data_res = "05FFFFFFFFFF06FFFFFFFFFF2AC20211805003020B01" + self.ExitMoney + self.posId + "0F"+ "3580DC00F030" + self.ExitEP + "0000" + self.posId \
-                                    + self.IndustryCode + self.Line+self.Site + "000015" + "00000000" + self.balance + self.DateTime + "584012215840FFFFFFFF000000000000"
+                                    + self.IndustryCode + self.Line+self.Site + "000015" + self.ExitMoney + self.balance + self.DateTime + "584012215840FFFFFFFF000000000000"
         self.dcs = self.calculate_DCS(self.exit_read_data_res)
         self.exit_read_data_res = "0000FF5700" + self.exit_read_data_res + self.dcs + "00"
         self.exit_write_data_res = "05FFFFFFFFFF06FFFFFFFFFF17C20115805401000F00000001"+self.DateTime
@@ -239,6 +235,8 @@ class UwbReaderAssistant:
     
     def get_mac(self, write_data_res, type):
         try:
+            macdata = self.Enter_macdata if type == 0 else self.Exit_macdata   #修改macdata，支持进出站的扣费不同
+
             if len(self.CardNo) != 20 or len(self.RandomNo) != 8 or len(self.OnlineSeqNo) != 4:
                 print("Len error: \nlen(self.CardNo) = %d\n len(self.RandomNo) = %d\n len(self.OnlineSeqNo) = %d", len(self.CardNo), len(self.RandomNo), len(self.OnlineSeqNo))
                 return False
@@ -251,7 +249,7 @@ class UwbReaderAssistant:
             print("loadKey: ", loadKey.hex())
             sessionKey = self.MyEcbDes.des3_encrypt(loadKey, bytes.fromhex(self.RandomNo + self.OnlineSeqNo + "0001"))[:8]
             print("sessionKey", sessionKey.hex())
-            self.MAC = self.MyEcbDes.process_macdata(sessionKey, self.Enter_macdata)[:4].hex()
+            self.MAC = self.MyEcbDes.process_macdata(sessionKey, macdata)[:4].hex()
             print(f"MAC: {self.MAC}")
             
             write_data_res =write_data_res + self.MAC + "08"
@@ -283,11 +281,11 @@ class UwbReaderAssistant:
         if index != -1:
             if command == 'C9':    # send 8050,80dc
                 self.CardNo = data_upper[index+122:index+142]
-                self.show_in_text_area(f"接收读卡:\n{data}")
+                # self.show_in_text_area(f"接收读卡:\n{data}")
                 self.send_enter_data(self.enter_read_data_res,1)    
                 self.flag = 1
             elif command == 'C3' and self.flag == 1:   #send 8054
-                self.show_in_text_area(f"接收8050-80DC返回:\n{data}")
+                # self.show_in_text_area(f"接收8050-80DC返回:\n{data}")
                 self.balance = data_upper[index+34:index+42]
                 self.OnlineSeqNo = data_upper[index+42:index+46]
                 self.RandomNo = data_upper[index+56:index+64]
@@ -295,7 +293,7 @@ class UwbReaderAssistant:
                     self.send_enter_data(self.enter_write_data_res,2)
                 self.flag += 1
             elif command == 'C3' and self.flag == 2:   #send halt
-                self.show_in_text_area(f"接收8054返回:\n{data}")
+                # self.show_in_text_area(f"接收8054返回:\n{data}")
                 self.send_enter_data(self.halt_data_res,3)
                 self.flag = 0
         else:
@@ -309,11 +307,11 @@ class UwbReaderAssistant:
         if index != -1:
             if command == 'C9':    # send 8050,80dc
                 self.CardNo = data_upper[index+122:index+142]
-                self.show_in_text_area1(f"接收读卡:\n{data}")
+                # self.show_in_text_area1(f"接收读卡:\n{data}")
                 self.send_exit_data(self.exit_read_data_res,1)    
                 self.flag = 1
             elif command == 'C3' and self.flag == 1:   #send 8054
-                self.show_in_text_area1(f"接收8050-80DC返回:\n{data}")
+                # self.show_in_text_area1(f"接收8050-80DC返回:\n{data}")
                 self.balance = data_upper[index+34:index+42]
                 self.OnlineSeqNo = data_upper[index+42:index+46]
                 self.RandomNo = data_upper[index+56:index+64]
@@ -321,7 +319,7 @@ class UwbReaderAssistant:
                     self.send_exit_data(self.exit_write_data_res,2)
                 self.flag += 1
             elif command == 'C3' and self.flag == 2:   #send halt
-                self.show_in_text_area1(f"接收8054返回:\n{data}")
+                # self.show_in_text_area1(f"接收8054返回:\n{data}")
                 self.send_exit_data(self.halt_data_res,3)
                 self.flag = 0
         else:
