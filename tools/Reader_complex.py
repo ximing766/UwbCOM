@@ -4,9 +4,12 @@ import serial.tools.list_ports
 import threading
 import ttkbootstrap as ttk
 import customtkinter
+from CTkTable import CTkTable
 import ctypes
 import time
+import os
 import sys
+from tkinter import messagebox
 from datetime import datetime
 sys.path.append("E:/Work/UWB/Code/UwbCOMCode")
 from Crypto.Cipher import DES, DES3
@@ -16,9 +19,13 @@ from Algorithm.Ecb_Des import MyEcbDes
 class UwbReaderAssistant:
     def __init__(self, master):
         self.master = master
-        self.master.title("Reader")
-        self.master.minsize(850, 530)
-        self.master.geometry("650x530")
+        self.version = "_v1.0"
+        self.master.title("UWBReader"+self.version)
+        self.master.minsize(900, 480)
+        self.master.geometry("900x480")
+        icon_path = os.path.join(os.path.dirname(__file__), 'UWBReader.ico')
+        self.master.wm_iconbitmap(icon_path)
+        self.table_columns        = ('ID','Status','Code')
         self.my_lib = ctypes.WinDLL("./tools/libRSCode.dll")
         self.my_lib.initialize_ecc()
         self.my_lib.encode_data.argtypes = [ctypes.POINTER(ctypes.c_ubyte), ctypes.c_int, ctypes.POINTER(ctypes.c_ubyte)]
@@ -30,10 +37,12 @@ class UwbReaderAssistant:
         self.ExitSerial = None
         self.enter_running = False
         self.exit_running = False
+        self.enter_id = 1
+        self.exit_id = 1
 
         self.defaultKey = bytes.fromhex("32D464AC81F1640A687D023BF99E35DF")
         self.posId      = "040900010001"
-        self.EnterMoney = "00000000"     #FIXME 两次交易的金额必须相同
+        self.EnterMoney = "00000000"     
         self.ExitMoney = "00000001"
         self.EnterEP = "03"
         self.ExitEP = "04"
@@ -48,19 +57,19 @@ class UwbReaderAssistant:
         self.DateTime = current_time.strftime("%Y%m%d%H%M%S")
         self.OnlineSeqNo = ""
         self.RandomNo = ""
-        self.Enter_macdata = self.EnterMoney + "09" + self.posId + self.DateTime + "80" + "0000000000"
+        self.Enter_macdata = self.EnterMoney + "09" + self.posId + self.DateTime + "80" + "0000000000"     # 这里的时间需要和APDU的时间一致
         self.Enter_macdata = bytes.fromhex(self.Enter_macdata)
         self.Exit_macdata = self.ExitMoney + "09" + self.posId + self.DateTime + "80" + "0000000000"
         self.Exit_macdata = bytes.fromhex(self.Exit_macdata)
                           
         self.enter_read_data_res = "05FFFFFFFFFF06FFFFFFFFFF2AC20211805003020B01" + self.EnterMoney + self.posId + "0F"+ "3580DC00F030" + self.EnterEP + "0000" + self.posId \
-                                    + self.IndustryCode + self.Line+self.Site + "000015" + self.EnterMoney + self.balance + self.DateTime + "584012215840FFFFFFFF000000000000"
+                                    + self.IndustryCode + self.Line + self.Site + "000015" + self.EnterMoney + self.balance + self.DateTime + "584012215840FFFFFFFF000000000000"
         self.dcs = self.calculate_DCS(self.enter_read_data_res)
-        self.enter_read_data_res = "0000FF5700" + self.enter_read_data_res + self.dcs + "00"   #XXX 长度57为self.enter_read_data_res的长度
-        self.enter_write_data_res = "05FFFFFFFFFF06FFFFFFFFFF17C20115805401000F00000001"+self.DateTime  #+self.MAC+"08"+"F500"
+        self.enter_read_data_res = "0000FF5700" + self.enter_read_data_res + self.dcs + "00"                #XXX 长度57为self.enter_read_data_res的长度
+        self.enter_write_data_res = "05FFFFFFFFFF06FFFFFFFFFF17C20115805401000F00000001"+self.DateTime      #+self.MAC+"08"+"F500"
        
         self.exit_read_data_res = "05FFFFFFFFFF06FFFFFFFFFF2AC20211805003020B01" + self.ExitMoney + self.posId + "0F"+ "3580DC00F030" + self.ExitEP + "0000" + self.posId \
-                                    + self.IndustryCode + self.Line+self.Site + "000015" + self.ExitMoney + self.balance + self.DateTime + "584012215840FFFFFFFF000000000000"
+                                    + self.IndustryCode + self.Line + self.Site + "000015" + self.ExitMoney + self.balance + self.DateTime + "584012215840FFFFFFFF000000000000"
         self.dcs = self.calculate_DCS(self.exit_read_data_res)
         self.exit_read_data_res = "0000FF5700" + self.exit_read_data_res + self.dcs + "00"
         self.exit_write_data_res = "05FFFFFFFFFF06FFFFFFFFFF17C20115805401000F00000001"+self.DateTime
@@ -69,23 +78,10 @@ class UwbReaderAssistant:
         self.halt_data_res =  "0000FF100005FFFFFFFFFF06FFFFFFFFFF44CA0000F100"
         print("Data:",self.exit_read_data_res)
         
-        if self.Use_RSCode:
-            self.read_data_res = bytes([0x00,0x00,0xFF,0xA7,0x00,0x05,0xFF,0xFF,0xFF,0xFF,0xFF,0x06,0xFF,0xFF,0xFF,0xFF,0xFF,0x28,0xC2,0x02,0x11,0x80,0x50,0x03,0x02,0x0B,
-                                        0x01,0x00,0x00,0x00,0x01,0x04,0x09,0x00,0x01,0x00,0x01,0x0F,0x85,0x80,0xDC,0x12,0xD0,0x80,0x27,0x12,0x7D,0x01,0x01,0x00,0x00,0x00,
-                                        0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
-                                        0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
-                                        0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
-                                        0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x19,0x01,0x02,0x3B,0x72,0x27,0x00,0x00,0x00,0x00,0x00,0x00,
-                                        0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x17,0x00])
-            self.write_data_res = bytes([0x00,0x00,0xFF,0x25,0x00,0x05,0xFF,0xFF,0xFF,0xFF,0xFF,0x06,0xFF,0xFF,0xFF,0xFF,0xFF,0x2A,0xC2,0x01,0x15,0x80,0x54,0x01,0x00,0x0F,
-                                        0x00,0x00,0x00,0x01,0x20,0x24,0x08,0x21,0x18,0x58,0x44,0xB2,0x56,0x8C,0xE5,0x08,0x76,0x00])
+        if self.Use_RSCode:   #  使用示例:目前不可用
             self.halt_data_res =  bytes([0x00, 0x00, 0xFF, 0x10, 0x00, 0x05, 0xFF, 0xFF, 0xFF, 0xFF,0xFF, 0x06, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0x44, 0xCA, 0x00, 0x00, 0xF1, 0x00])
-            
             # 添加RS编码
-            self.read_data_res = self.RS_Encode(self.read_data_res)
-            self.write_data_res = self.RS_Encode(self.write_data_res)
             self.halt_data_res = self.RS_Encode(self.halt_data_res)
-            
             # 加入误差
             error = "010203"
             self.read_data_res = self.read_data_res[:-29] + error + self.read_data_res[-23:]    
@@ -95,67 +91,159 @@ class UwbReaderAssistant:
         self.flag = 0
         self.sequence = "06FFFFFFFFFF05FFFFFFFFFF"
 
-        # GUI 设置
-        master.grid_columnconfigure(0, weight=1)
-        master.grid_columnconfigure(1, weight=1)
-        master.grid_columnconfigure(2, weight=1)
-        master.grid_columnconfigure(3, weight=1)
-        master.grid_columnconfigure(4, weight=1)
-        master.grid_columnconfigure(5, weight=1)
+        self.create_widgets()
+
+    def create_widgets(self):
+        for col in range(7):
+            self.master.grid_columnconfigure(col, weight=1)
+        self.master.grid_rowconfigure(2, weight=1)
 
         self.port_options = self.get_serial_ports()
-        self.port_var = tk.StringVar(master)
+        self.port_var = tk.StringVar(self.master)
         if self.port_options:  # 检查是否有可用的串口
             self.port_var.set(self.port_options[0])  # 默认选择第一个串口
         else:
             self.port_var.set('')  # 如果没有串口，设置为空字符串
         
         self.port_options1 = self.get_serial_ports()
-        self.port_var1 = tk.StringVar(master)
+        self.port_var1 = tk.StringVar(self.master)
         if self.port_options1:  # 检查是否有可用的串口
             self.port_var1.set(self.port_options1[0])  # 默认选择第一个串口
         else:
             self.port_var1.set('')  # 如果没有串口，设置为空字符串
-
-        self.text_area = customtkinter.CTkTextbox(master, width=200, height=400,  fg_color=("#A0C8CF"))
-        self.text_area.grid(column=0, row=0, columnspan=3, padx=10, pady=10,sticky='nsew')
-
-        self.text_area1 = customtkinter.CTkTextbox(master, width=200, height=400,  fg_color=("#A0C8CF"))
-        self.text_area1.grid(column=3, row=0, columnspan=3, padx=10, pady=10,sticky='nsew')
-
-        self.port_label = customtkinter.CTkLabel(master, text="Enter COM:", corner_radius = 10, fg_color= ("#A0C8CF"), font=("Roboto", 15))
-        self.port_label.grid(column=0, row=1, padx=10, pady=10,sticky='nsew')
-
-        self.port_label1 = customtkinter.CTkLabel(master, text="Exit COM:", corner_radius = 10, fg_color= ("#A0C8CF"), font=("Roboto", 15))
-        self.port_label1.grid(column=3, row=1, padx=10, pady=10,sticky='nsew')
-
-        self.port_menu = customtkinter.CTkOptionMenu(master, variable=self.port_var, values=[*self.port_options], font=("Roboto", 15))
-        self.port_menu.grid(column=1, row=1, padx=10, pady=10,sticky='nsew')
         
-        self.port_menu1 = customtkinter.CTkOptionMenu(master, variable=self.port_var1, values=[*self.port_options1], font=("Roboto", 15))
-        self.port_menu1.grid(column=4, row=1, padx=10, pady=10,sticky='nsew')
+        self.baudrate_var = tk.IntVar(self.master, 460800)  # 默认波特率9600
+        self.baudrate_var1 = tk.IntVar(self.master, 460800)  # 默认波特率9600
 
-        self.baudrate_var = tk.IntVar(master, 460800)  # 默认波特率9600
-        self.baudrate_menu = customtkinter.CTkOptionMenu(master, variable=self.baudrate_var, values = ["460800", "115200", "3000000", "9600"], font=("Roboto", 15))
-        self.baudrate_menu.grid(column=2, row=1, padx=10, pady=10,sticky='nsew')
+        self.port_label = customtkinter.CTkLabel(self.master, text="ENTER STATION", corner_radius = 10, fg_color= ("#6699CC"), font=("Roboto", 18), text_color=("#FFF8DC"))
+        self.port_label.grid(column=0, row=0, columnspan = 3, padx=75, pady=10,sticky='nsew')
 
-        self.baudrate_var1 = tk.IntVar(master, 460800)  # 默认波特率9600
-        self.baudrate_menu1 = customtkinter.CTkOptionMenu(master, variable=self.baudrate_var1, values = ["460800", "115200", "3000000", "9600"], font=("Roboto", 15))
-        self.baudrate_menu1.grid(column=5, row=1, padx=10, pady=10,sticky='nsew')
+        self.port_label1 = customtkinter.CTkLabel(self.master, text="EXIT STATION", corner_radius = 10, fg_color= ("#6699CC"), font=("Roboto", 18), text_color=("#FFF8DC"))
+        self.port_label1.grid(column=4, row=0, columnspan = 3, padx=75, pady=10,sticky='nsew')
 
-        self.segemented_button = customtkinter.CTkSegmentedButton(master, values=["Connect", "Disconnect"], command=self.segmented_button_callback, font=("Roboto", 15), width=280)
-        self.segemented_button.grid(column=0, columnspan=2, row=2, padx=10, pady=10,sticky='nsew')
+        ## Tab ##
+        TabColor = ("#E0F2F8")
+        TextColor = ("#663300")
+        self.EnterTab = customtkinter.CTkTabview(self.master, fg_color=TabColor)
+        self.EnterTab.grid(row=2, column=0, columnspan=3, rowspan=5, padx=10, pady=10,sticky='nsew')
+        self.EnterTab.add("COM")
+        self.EnterTab.add("Setting")
+        self.EnterTab.add("Enter")
+        self.EnterTab.set("COM")
+
+        self.ExitTab = customtkinter.CTkTabview(master=self.master, fg_color=TabColor)
+        self.ExitTab.grid(row=2, column=4, columnspan=3, rowspan = 5, padx=10, pady=10,sticky='nsew')
+        self.ExitTab.add("COM")
+        self.ExitTab.add("Setting")
+        self.ExitTab.add("Exit")
+        self.ExitTab.set("Exit")
+
+        EnterTabFrame = customtkinter.CTkFrame(self.EnterTab.tab("Enter"))
+        EnterTabFrame.pack(padx=20, pady=20, fill="both", expand=True)
+        ExitTabFrame = customtkinter.CTkFrame(self.ExitTab.tab("Exit"))
+        ExitTabFrame.pack(padx=20, pady=20, fill="both", expand=True)
+
+        ## Textbox ##
+        self.text_area = customtkinter.CTkTextbox(EnterTabFrame, width=200, height=400,  fg_color=("#E6E6FF"))
+        self.text_area.pack(padx=1, pady=1, fill="both", expand=True)
+
+        self.text_area1 = customtkinter.CTkTextbox(ExitTabFrame, width=200, height=400,  fg_color=("#E6E6FF"))  # A0C8CF
+        self.text_area1.pack(padx=1, pady=1, fill="both", expand=True)
+
+        ## Setting Enter ##
+        industry_frame = customtkinter.CTkFrame(self.EnterTab.tab("Setting"),fg_color= TabColor)
+        industry_frame.pack(padx=20, pady=10, fill="x")
+        industry_code_label = customtkinter.CTkLabel(industry_frame, text="行业代码:", font=("Roboto", 15), text_color=TextColor)
+        industry_code_label.pack(side="left", padx=(0, 10))  # 左对齐，右侧留出一些间距
+        self.IndustryCode_val = tk.StringVar(self.master, "BRT")
+        self.IndustryCode_menu = customtkinter.CTkOptionMenu(industry_frame, variable=self.IndustryCode_val, values=["公交", "地铁", "轮渡", "BRT"], font=("Roboto", 15))
+        self.IndustryCode_menu.pack(side="left")
+
+        line_frame = customtkinter.CTkFrame(self.EnterTab.tab("Setting"),fg_color= TabColor)
+        line_frame.pack(padx=20, pady=10, fill="x")
+        line_label = customtkinter.CTkLabel(line_frame, text="线路代码:", font=("Roboto", 15), text_color=TextColor)
+        line_label.pack(side="left", padx=(0, 10))  # 左对齐，右侧留出一些间距
+        self.Line_val = tk.StringVar(self.master, "0000")
+        self.Line_menu = customtkinter.CTkOptionMenu(line_frame, variable=self.Line_val, values=["0000", "0001", "0002", "0003"], font=("Roboto", 15))
+        self.Line_menu.pack(side="left")
+        
+        site_frame = customtkinter.CTkFrame(self.EnterTab.tab("Setting"),fg_color= TabColor)
+        site_frame.pack(padx=20, pady=10, fill="x")
+        site_label = customtkinter.CTkLabel(site_frame, text="站点代码:", font=("Roboto", 15), text_color=TextColor)
+        site_label.pack(side="left", padx=(0, 10))  # 左对齐，右侧留出一些间距
+        self.Site_val = tk.StringVar(self.master, "0000")
+        self.Site_menu = customtkinter.CTkOptionMenu(site_frame, variable=self.Site_val, values=["0000", "0001", "0002", "0003"], font=("Roboto", 15))
+        self.Site_menu.pack(side="left")
+
+        ## Setting Exit ##
+        industry_code_frame = customtkinter.CTkFrame(self.ExitTab.tab("Setting"),fg_color= TabColor)
+        industry_code_frame.pack(padx=20, pady=10, fill="x")
+        industry_code_label = customtkinter.CTkLabel(industry_code_frame, text="行业代码:", font=("Roboto", 15), text_color=TextColor)
+        industry_code_label.pack(side="left", padx=(0, 10))  # 左对齐，右侧留出一些间距
+        self.IndustryCode_val1 = tk.StringVar(self.master, "BRT")
+        self.IndustryCode_menu1 = customtkinter.CTkOptionMenu(industry_code_frame, variable=self.IndustryCode_val1, values=["公交", "地铁", "轮渡", "BRT"], font=("Roboto", 15))
+        self.IndustryCode_menu1.pack(side="left")
+
+        line_frame1 = customtkinter.CTkFrame(self.ExitTab.tab("Setting"),fg_color= TabColor)
+        line_frame1.pack(padx=20, pady=10, fill="x")
+        line_label = customtkinter.CTkLabel(line_frame1, text="线路代码:", font=("Roboto", 15), text_color=TextColor)
+        line_label.pack(side="left", padx=(0, 10))  # 左对齐，右侧留出一些间距
+        self.Line_val1 = tk.StringVar(self.master, "0000")
+        self.Line_menu1 = customtkinter.CTkOptionMenu(line_frame1, variable=self.Line_val1, values=["0000", "0001", "0002", "0003"], font=("Roboto", 15))
+        self.Line_menu1.pack(side="left")
+
+        site_frame1 = customtkinter.CTkFrame(self.ExitTab.tab("Setting"),fg_color= TabColor)
+        site_frame1.pack(padx=20, pady=10, fill="x")
+        site_label = customtkinter.CTkLabel(site_frame1, text="站点代码:", font=("Roboto", 15), text_color=TextColor)
+        site_label.pack(side="left", padx=(0, 10))  # 左对齐，右侧留出一些间距
+        self.Site_val1 = tk.StringVar(self.master, "0000")
+        self.Site_menu1 = customtkinter.CTkOptionMenu(site_frame1, variable=self.Site_val1, values=["0000", "0001", "0002", "0003"], font=("Roboto", 15))
+        self.Site_menu1.pack(side="left")
+
+        ## COM Enter ##
+        port_frame = customtkinter.CTkFrame(self.EnterTab.tab("COM"),fg_color= TabColor)
+        port_frame.pack(padx=20, pady=10, fill="x")
+        port_label = customtkinter.CTkLabel(port_frame, text="COM选择 :", font=("Roboto", 15), text_color=TextColor)
+        port_label.pack(side="left", padx=(0, 22))  # 左对齐，右侧留出一些间距
+
+        self.port_menu = customtkinter.CTkOptionMenu(port_frame, variable=self.port_var, values=[*self.port_options], font=("Roboto", 15))
+        self.port_menu.pack(side="left")
+        baudrate_frame = customtkinter.CTkFrame(self.EnterTab.tab("COM"),fg_color= TabColor)
+        baudrate_frame.pack(padx=20, pady=10, fill="x")
+        baudrate_label = customtkinter.CTkLabel(baudrate_frame, text="波特率选择 :", font=("Roboto", 15), text_color=TextColor)
+        baudrate_label.pack(side="left", padx=(0, 10))  # 左对齐，右侧留出一些间距
+        self.baudrate_menu = customtkinter.CTkOptionMenu(baudrate_frame, variable=self.baudrate_var, values=["460800", "115200", "3000000", "9600"], font=("Roboto", 15))
+        self.baudrate_menu.pack(side="left")
+
+        # self.clear_button = customtkinter.CTkButton(self.EnterTab.tab("COM"), text="Clear", command=self.clear_text_area, font=("Roboto", 15))
+        # self.clear_button.pack(padx=20,pady=10)
+        self.segemented_button = customtkinter.CTkSegmentedButton(self.EnterTab.tab("COM"), values=["Connect", "Disconnect"], command=self.segmented_button_callback, font=("Roboto", 15), width=280)
+        self.segemented_button.pack(padx=20, pady=10, fill="x")
         self.segemented_button.set("Disconnect")
 
-        self.segemented_button1 = customtkinter.CTkSegmentedButton(master, values=["Connect", "Disconnect"], command=self.segmented_button_callback1, font=("Roboto", 15), width=280)
-        self.segemented_button1.grid(column=3, columnspan=2, row=2, padx=10, pady=10,sticky='nsew')
+        ## COM Exit ##
+        port_frame1 = customtkinter.CTkFrame(self.ExitTab.tab("COM"),fg_color= TabColor)
+        port_frame1.pack(padx=20, pady=10, fill="x")
+        port_label1 = customtkinter.CTkLabel(port_frame1, text="COM选择 :", font=("Roboto", 15), text_color=TextColor)
+        port_label1.pack(side="left", padx=(0, 22))  # 左对齐，右侧留出一些间距
+        self.port_menu1 = customtkinter.CTkOptionMenu(port_frame1, variable=self.port_var1, values=[*self.port_options1], font=("Roboto", 15))
+        self.port_menu1.pack(side="left")
+
+        baudrate_frame1 = customtkinter.CTkFrame(self.ExitTab.tab("COM"),fg_color= TabColor)
+        baudrate_frame1.pack(padx=20, pady=10, fill="x")
+        baudrate_label1 = customtkinter.CTkLabel(baudrate_frame1, text="波特率选择 :", font=("Roboto", 15), text_color=TextColor)
+        baudrate_label1.pack(side="left", padx=(0, 10))  # 左对齐，右侧留出一些间距
+        self.baudrate_menu1 = customtkinter.CTkOptionMenu(baudrate_frame1, variable=self.baudrate_var1, values=["460800", "115200", "3000000", "9600"], font=("Roboto", 15))
+        self.baudrate_menu1.pack(side="left")
+        # self.port_menu1 = customtkinter.CTkOptionMenu(self.ExitTab.tab("COM"), variable=self.port_var1, values=[*self.port_options1], font=("Roboto", 15))
+        # self.port_menu1.pack(padx=20,pady=10 )
+        # self.baudrate_menu1 = customtkinter.CTkOptionMenu(self.ExitTab.tab("COM"), variable=self.baudrate_var1, values = ["460800", "115200", "3000000", "9600"], font=("Roboto", 15))
+        # self.baudrate_menu1.pack(padx=20,pady=10 )
+        # self.clear_button1 = customtkinter.CTkButton(self.ExitTab.tab("COM"), text="Clear", command=self.clear_text_area1, font=("Roboto", 15))
+        # self.clear_button1.pack(padx=20,pady=10 )
+        self.segemented_button1 = customtkinter.CTkSegmentedButton(self.ExitTab.tab("COM"), values=["Connect", "Disconnect"], command=self.segmented_button_callback1, font=("Roboto", 15), width=200)
+        self.segemented_button1.pack(padx=20, pady=10, fill="x")
         self.segemented_button1.set("Disconnect")
-
-        self.clear_button = customtkinter.CTkButton(master, text="Clear", command=self.clear_text_area, font=("Roboto", 15))
-        self.clear_button.grid(column=2, row=2, padx=10, pady=10, sticky='nsew')
-
-        self.clear_button1 = customtkinter.CTkButton(master, text="Clear", command=self.clear_text_area, font=("Roboto", 15))
-        self.clear_button1.grid(column=5, row=2, padx=10, pady=10, sticky='nsew')
     
     def calculate_DCS(self,hex_string):
         data = bytes.fromhex(hex_string)
@@ -174,7 +262,9 @@ class UwbReaderAssistant:
         return hex_string
     
     def clear_text_area(self):
-        self.text_area.delete(1.0, tk.END)  # 清除文本框内容
+        self.text_area.delete(1.0, tk.END)  
+    def clear_text_area1(self):
+        self.text_area1.delete(1.0, tk.END)  
     
     def segmented_button_callback(self, value):
         if value == "Connect":
@@ -194,7 +284,7 @@ class UwbReaderAssistant:
             ports = serial.tools.list_ports.comports()
             ports = [port.device for port in ports]
         except Exception as e:
-            self.show_in_text_area(f"获取串口列表失败: {e}")
+            messagebox.showerror("Request Uart List error:", e)
         return ports
 
     def connect_enter(self):
@@ -203,11 +293,8 @@ class UwbReaderAssistant:
                 self.EnterSerial = serial.Serial(self.port_var.get(), self.baudrate_var.get(), timeout=0.05)   # reader 30ms返回
                 self.enter_running = True
                 self.enter_read()
-                self.show_in_text_area(f"串口已打开: {self.port_var.get()} {self.baudrate_var.get()}")
-            else:
-                self.show_in_text_area("请选择一个串口")
         except Exception as e:
-            self.show_in_text_area(f"连接失败: {e}")
+            messagebox.showerror("Connect Uart error:", e)
     
     def connect_exit(self):
         try:
@@ -215,23 +302,18 @@ class UwbReaderAssistant:
                 self.ExitSerial = serial.Serial(self.port_var1.get(), self.baudrate_var1.get(), timeout=0.05)   # reader 30ms返回
                 self.exit_running = True
                 self.exit_read()
-                self.show_in_text_area1(f"串口已打开: {self.port_var1.get()} {self.baudrate_var1.get()}")
-            else:
-                self.show_in_text_area1("请选择一个串口")
         except Exception as e:
-            self.show_in_text_area(f"连接失败: {e}")
+            messagebox.showerror("Connect Uart error:", e)
 
     def disconnect_enter(self):
         if self.EnterSerial:
             self.EnterSerial.close()
         self.enter_running = False
-        self.show_in_text_area(f"串口已关闭")
 
     def disconnect_exit(self):
         if self.ExitSerial:
             self.ExitSerial.close()
         self.exit_running = False
-        self.show_in_text_area1(f"串口已关闭")
     
     def get_mac(self, write_data_res, type):
         try:
@@ -261,7 +343,7 @@ class UwbReaderAssistant:
             else:
                 self.exit_write_data_res = write_data_res
         except Exception as e:
-            print(f"MAC计算失败: {e}")
+            messagebox.showerror("MAC cacl error:", e)
             return False
         return True
 
@@ -281,11 +363,9 @@ class UwbReaderAssistant:
         if index != -1:
             if command == 'C9':    # send 8050,80dc
                 self.CardNo = data_upper[index+122:index+142]
-                # self.show_in_text_area(f"接收读卡:\n{data}")
                 self.send_enter_data(self.enter_read_data_res,1)    
                 self.flag = 1
             elif command == 'C3' and self.flag == 1:   #send 8054
-                # self.show_in_text_area(f"接收8050-80DC返回:\n{data}")
                 self.balance = data_upper[index+34:index+42]
                 self.OnlineSeqNo = data_upper[index+42:index+46]
                 self.RandomNo = data_upper[index+56:index+64]
@@ -293,7 +373,6 @@ class UwbReaderAssistant:
                     self.send_enter_data(self.enter_write_data_res,2)
                 self.flag += 1
             elif command == 'C3' and self.flag == 2:   #send halt
-                # self.show_in_text_area(f"接收8054返回:\n{data}")
                 self.send_enter_data(self.halt_data_res,3)
                 self.flag = 0
         else:
@@ -307,11 +386,9 @@ class UwbReaderAssistant:
         if index != -1:
             if command == 'C9':    # send 8050,80dc
                 self.CardNo = data_upper[index+122:index+142]
-                # self.show_in_text_area1(f"接收读卡:\n{data}")
                 self.send_exit_data(self.exit_read_data_res,1)    
                 self.flag = 1
             elif command == 'C3' and self.flag == 1:   #send 8054
-                # self.show_in_text_area1(f"接收8050-80DC返回:\n{data}")
                 self.balance = data_upper[index+34:index+42]
                 self.OnlineSeqNo = data_upper[index+42:index+46]
                 self.RandomNo = data_upper[index+56:index+64]
@@ -319,7 +396,6 @@ class UwbReaderAssistant:
                     self.send_exit_data(self.exit_write_data_res,2)
                 self.flag += 1
             elif command == 'C3' and self.flag == 2:   #send halt
-                # self.show_in_text_area1(f"接收8054返回:\n{data}")
                 self.send_exit_data(self.halt_data_res,3)
                 self.flag = 0
         else:
@@ -331,7 +407,7 @@ class UwbReaderAssistant:
                 if data := self.EnterSerial.readline():
                     self.EnterApduHandle(data.hex(), self.sequence)
             except Exception as e:
-                self.show_in_text_area(f"Read data failed!!!: {e}")
+                messagebox.showerror("Read data error:", e)
     
     def read_data_exit(self):
         while self.exit_running and self.ExitSerial:
@@ -339,49 +415,44 @@ class UwbReaderAssistant:
                 if data := self.ExitSerial.readline():
                     self.ExitApduHandle(data.hex(), self.sequence)
             except Exception as e:
-                self.show_in_text_area1(f"Read data failed!!!: {e}")
+                messagebox.showerror("Read data error:", e)
 
     def send_enter_data(self, hex_data, type):
         try:
             if len(hex_data) % 2 != 0:
-                self.show_in_text_area("Error:16进制数据长度应为偶数")
+                messagebox.showerror("data len is not even:", e)
                 return
-
             byte_data = bytes.fromhex(hex_data)
             if self.EnterSerial and self.EnterSerial.is_open:
                 self.EnterSerial.write(byte_data)
-                if type == 1:
-                    self.show_in_text_area(f"发送8050|80DC:\n{hex_data}")
-                elif type == 2:
-                    self.show_in_text_area(f"发送8054:\n{hex_data}")
+                if type == 2:
                     self.enter_write_data_res = "05FFFFFFFFFF06FFFFFFFFFF17C20115805401000F00000001"+self.DateTime
                 elif type == 3:
-                    self.show_in_text_area(f"发送HALT:\n{hex_data}")
+                    self.show_in_text_area(datetime.now().strftime("%Y-%m-%d-%H:%M:%S") + "  |  " + "Enter OK")
+                    self.enter_id += 1
             else:
-                self.show_in_text_area("错误：串口未打开")
+                messagebox.showerror("Uart not opened:", e)
         except ValueError as e:
-            self.show_in_text_area(f"发送数据失败：{e}")
+            messagebox.showerror("Send data error:", e)     
     
     def send_exit_data(self, hex_data,type):
         try:
             if len(hex_data) % 2 != 0:
-                self.show_in_text_area("Error:16进制数据长度应为偶数")
+                messagebox.showerror("data len is not even:", e)
                 return
 
             byte_data = bytes.fromhex(hex_data)
             if self.ExitSerial and self.ExitSerial.is_open:
                 self.ExitSerial.write(byte_data)
-                if type == 1:
-                    self.show_in_text_area1(f"发送8050|80DC:\n{hex_data}")
-                elif type == 2:
-                    self.show_in_text_area1(f"发送8054:\n{hex_data}")
+                if type == 2:
                     self.exit_write_data_res = "05FFFFFFFFFF06FFFFFFFFFF17C20115805401000F00000001"+self.DateTime
                 elif type == 3:
-                    self.show_in_text_area1(f"发送HALT:\n{hex_data}")
+                    self.show_in_text_area1(datetime.now().strftime("%Y-%m-%d-%H:%M:%S") + "  |  " + "Exit OK")
+
             else:
-                self.show_in_text_area1("错误：串口未打开")
+                messagebox.showerror("Uart not opened:", e)
         except ValueError as e:
-            self.show_in_text_area1(f"发送数据失败：{e}")
+            messagebox.showerror("Send data error:", e)
 
     def show_in_text_area(self, message):
         self.text_area.insert(tk.END, message + "\n" + "\n")
@@ -391,8 +462,33 @@ class UwbReaderAssistant:
         self.text_area1.insert(tk.END, message + "\n" + "\n")
         self.text_area1.see(tk.END)
 
-customtkinter.set_appearance_mode("light")  # Modes: System (default), light, dark
-customtkinter.set_default_color_theme("blue")  # Themes: "blue" (standard), "green", "dark-blue"
-root = customtkinter.CTk()
-app = UwbReaderAssistant(root)
-root.mainloop()
+    def show_about(self):
+        messagebox.showinfo("关于", f"UWBReader {self.version}\n\n"
+                             "版权所有 © 2024 可为信息技术有限公司\n"
+                             "Author: @QLL\n"
+                             "Email: Tommy.yang@cardshare.cn\n"
+                            )
+
+    def change_theme(self, theme ):
+        customtkinter.set_appearance_mode(theme)
+
+if __name__ == "__main__":
+    customtkinter.set_appearance_mode("light")  # Modes: System (default), light, dark
+    customtkinter.set_default_color_theme("blue")  # Themes: "blue" (standard), "green", "dark-blue"
+    root = customtkinter.CTk()
+    app = UwbReaderAssistant(root)
+
+    menubar = tk.Menu(root)  
+    root.config(menu=menubar)
+
+    theme_menu = tk.Menu(menubar, tearoff=0)
+    menubar.add_cascade(label="主题", menu=theme_menu)
+    theme_menu.add_command(label="浅色模式", command=lambda: app.change_theme("light"))
+    theme_menu.add_command(label="深色模式", command=lambda: app.change_theme("dark"))
+    theme_menu.add_command(label="跟随系统", command=lambda: app.change_theme("System"))
+
+    about_menu = tk.Menu(menubar, tearoff=0)
+    menubar.add_cascade(label="关于", menu=about_menu)
+    about_menu.add_command(label = "关于", command=app.show_about)
+
+    root.mainloop()
