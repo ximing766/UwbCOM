@@ -1,5 +1,6 @@
 /dist
 /output
+/tools/output
 /temp
 /build
 /UwbCOM_*.spec

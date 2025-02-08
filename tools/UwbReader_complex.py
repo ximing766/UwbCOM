@@ -21,7 +21,7 @@ class UwbReaderAssistant:
         self.master = master
         self.version = "_v1.0"
         self.master.title("UWBReader"+self.version)
-        self.master.minsize(900, 250)
+        self.master.minsize(400, 200)
         self.master.geometry("900x450")
         icon_path = os.path.join(os.path.dirname(__file__), 'UWBReader.ico')
         self.master.wm_iconbitmap(icon_path)
@@ -36,6 +36,7 @@ class UwbReaderAssistant:
         self.ExitSerial = None
         self.enter_running = False
         self.exit_running = False
+        self.timeout_threshold = 0.5
         self.enter_id = 1
         self.exit_id = 1
         self.flag = 0
@@ -94,7 +95,7 @@ class UwbReaderAssistant:
             if self.ExitMoney == "":
                 messagebox.showerror("please input exit money:")
                 return 0
-            print(f"Exit_IndustryCode: {Exit_IndustryCode_val}  Exit_Line: {Exit_Line_val}  Exit_Site: {Exit_Site_val}")
+            # print(f"Exit_IndustryCode: {Exit_IndustryCode_val}  Exit_Line: {Exit_Line_val}  Exit_Site: {Exit_Site_val}")
             self.exit_read_data_res = "05FFFFFFFFFF06FFFFFFFFFF2AC20211805003020B01" + self.ExitMoney + self.posId + "0F"+ "3580DC00F030" + self.ExitEP + "0000" + self.posId \
                                         + Exit_IndustryCode_val + Exit_Line_val + Exit_Site_val + "000015" + self.ExitMoney + self.balance + self.DateTime + "584012215840FFFFFFFF000000000000"
             self.dcs = self.calculate_DCS(self.exit_read_data_res)
@@ -112,6 +113,7 @@ class UwbReaderAssistant:
     def create_widgets(self):
         for col in range(7):
             self.master.grid_columnconfigure(col, weight=1)
+        self.master.grid_rowconfigure(0, weight=0)
         self.master.grid_rowconfigure(2, weight=1)
 
         self.port_options = self.get_serial_ports()
@@ -131,12 +133,6 @@ class UwbReaderAssistant:
         self.baudrate_var = tk.IntVar(self.master, 460800)  # 默认波特率9600
         self.baudrate_var1 = tk.IntVar(self.master, 460800)  # 默认波特率9600
 
-        # self.port_label = customtkinter.CTkLabel(self.master, text="ENTER STATION", corner_radius = 10, fg_color= ("#6699CC"), font=("Roboto", 18), text_color=("#FFF8DC"))
-        # self.port_label.grid(column=0, row=0, columnspan = 3, padx=75, pady=10,sticky='nsew')
-
-        # self.port_label1 = customtkinter.CTkLabel(self.master, text="EXIT STATION", corner_radius = 10, fg_color= ("#6699CC"), font=("Roboto", 18), text_color=("#FFF8DC"))
-        # self.port_label1.grid(column=4, row=0, columnspan = 3, padx=75, pady=10,sticky='nsew')
-
         def create_label(master, text, column, row, columnspan, padx, pady):
             label_style = {
                 "corner_radius": 15,
@@ -146,12 +142,12 @@ class UwbReaderAssistant:
                 "anchor": "center"
             }
             label = customtkinter.CTkLabel(master, text=text, **label_style)
-            label.grid(column=column, row=row, columnspan=columnspan, padx=padx, pady=pady, sticky='nsew')
+            label.grid(column=column, row=row, columnspan=columnspan, padx=padx, pady=pady, sticky='ew')
             return label
 
         # 创建标题
-        self.port_label = create_label(self.master, "ENTER STATION", 0, 0, 3, 75, 10)
-        self.port_label1 = create_label(self.master, "EXIT STATION", 4, 0, 3, 75, 10)
+        self.port_label = create_label(self.master, "ENTER", 0, 0, 3, 75, 10)
+        self.port_label1 = create_label(self.master, "EXIT", 4, 0, 3, 75, 10)
 
         ## Tab ##
         TabColor = ("#E0F2F8","#AED6F1")
@@ -268,6 +264,15 @@ class UwbReaderAssistant:
         self.segemented_button.pack(padx=20, pady=10, fill="x")
         self.segemented_button.set("Disconnect")
 
+        other_frame = customtkinter.CTkFrame(self.EnterTab.tab("COM"),fg_color= TabColor)
+        other_frame.pack(padx=20, pady=10, fill="x")
+        self.switch_var = customtkinter.StringVar(value="off")
+        switch = customtkinter.CTkCheckBox(other_frame, text="Pin to Screen", command=self.toggle_topmost, variable=self.switch_var, onvalue="on", offvalue="off", text_color=TextColor)
+        switch.pack(side="left")
+
+        info_label = customtkinter.CTkLabel(self.EnterTab.tab("COM"), text="仅授权小米内部使用", font=("Roboto", 16), text_color="red")
+        info_label.pack(side="left", padx=20, pady=10)
+
         ## COM Exit ##
         port_frame1 = customtkinter.CTkFrame(self.ExitTab.tab("COM"),fg_color= TabColor)
         port_frame1.pack(padx=20, pady=10, fill="x")
@@ -333,8 +338,9 @@ class UwbReaderAssistant:
     def connect_enter(self):
         try:
             if self.port_var.get():
-                self.EnterSerial = serial.Serial(self.port_var.get(), self.baudrate_var.get(), timeout=0.05)   # reader 30ms返回
+                self.EnterSerial = serial.Serial(self.port_var.get(), self.baudrate_var.get(), timeout=0.1)
                 self.enter_running = True
+                
                 # self.enter_read()
                 self.read_thread_enter = threading.Thread(target=self.read_data_enter)
                 self.read_thread_enter.start()
@@ -344,7 +350,7 @@ class UwbReaderAssistant:
     def connect_exit(self):
         try:
             if self.port_var1.get():
-                self.ExitSerial = serial.Serial(self.port_var1.get(), self.baudrate_var1.get(), timeout=0.05)   # reader 30ms返回
+                self.ExitSerial = serial.Serial(self.port_var1.get(), self.baudrate_var1.get(), timeout=0.5)
                 self.exit_running = True
                 # self.exit_read()
                 self.read_thread_exit = threading.Thread(target=self.read_data_exit)
@@ -372,13 +378,13 @@ class UwbReaderAssistant:
     
     def get_mac(self, write_data_res, type):
         try:
-            macdata = self.Enter_macdata if type == 0 else self.Exit_macdata   #修改macdata，支持进出站的扣费不同
+            macdata = self.Enter_macdata if type == 0 else self.Exit_macdata   #修改macdata
 
             if len(self.CardNo) != 20 or len(self.RandomNo) != 8 or len(self.OnlineSeqNo) != 4:
                 print(f"Len ERROR: \nlen(self.CardNo) = {len(self.CardNo)} len(self.RandomNo) = {len(self.RandomNo)} len(self.OnlineSeqNo) = {len(self.OnlineSeqNo)}")
                 print(f"CardNo: {self.CardNo}  RandomNo: {self.RandomNo}  OnlineSeqNo: {self.OnlineSeqNo}")
                 return False
-            print(f"RandomNo: {self.RandomNo}  OnlineSeqNo: {self.OnlineSeqNo}  CardNo: {self.CardNo}  DateTime: {self.DateTime}")
+            # print(f"RandomNo: {self.RandomNo}  OnlineSeqNo: {self.OnlineSeqNo}  CardNo: {self.CardNo}  DateTime: {self.DateTime}")
             factor = self.CardNo[-16:]
             xor_result = self.MyEcbDes.str_xor(factor, "FFFFFFFFFFFFFFFF")
             factor = factor + xor_result
@@ -393,7 +399,7 @@ class UwbReaderAssistant:
             write_data_res =write_data_res + self.MAC + "08"
             self.dcs = self.calculate_DCS(write_data_res)
             write_data_res ="0000FF2500" + write_data_res + self.dcs + "00"
-            print(f"write_data_res: {write_data_res}")
+            # print(f"write_data_res: {write_data_res}")
             if type == 0:
                 self.enter_write_data_res = write_data_res
             else:
@@ -402,14 +408,6 @@ class UwbReaderAssistant:
             messagebox.showerror("MAC cacl error:", e)
             return False
         return True
-
-    # def enter_read(self):
-    #     if self.enter_running:
-    #         threading.Thread(target=self.read_data_enter).start()
-        
-    # def exit_read(self):
-    #     if self.exit_running:
-    #         threading.Thread(target=self.read_data_exit).start()
 
     def EnterApduHandle(self, data, sequence):
         data_upper = data.upper()
@@ -428,15 +426,15 @@ class UwbReaderAssistant:
                 self.balance = data_upper[index+34:index+42]
                 self.OnlineSeqNo = data_upper[index+42:index+46]
                 self.RandomNo = data_upper[index+56:index+64]
-                print(f"data: {data}")
                 self.update_write_data_res()
                 if self.get_mac(self.enter_write_data_res,0) == True:
                     self.send_enter_data(self.enter_write_data_res,2)
                     print("send enter write data")
                 self.flag += 1
             elif command == 'C3' and self.flag == 2:   #send halt
-                self.send_enter_data(self.halt_data_res,3)
                 print("send enter halt data")
+                self.send_enter_data(self.halt_data_res,3)
+                
                 self.flag = 0
         else:
             pass
@@ -451,39 +449,83 @@ class UwbReaderAssistant:
             if command == 'C9':    # send 8050,80dc
                 self.CardNo = data_upper[index+122:index+142]
                 if self.update_read_data_res(1) != 0:
+                    print("send exit read data")  
                     self.send_exit_data(self.exit_read_data_res,1)    
                     self.flag = 1
             elif command == 'C3' and self.flag == 1:   #send 8054
                 self.balance = data_upper[index+34:index+42]
                 self.OnlineSeqNo = data_upper[index+42:index+46]
                 self.RandomNo = data_upper[index+56:index+64]
-                print(f"RandomNo: {data_upper[index+56:index+64]}")
                 self.update_write_data_res()
                 if self.get_mac(self.exit_write_data_res,1) == True:
                     self.send_exit_data(self.exit_write_data_res,2)
+                    print("send exit write data")  
                 self.flag += 1
             elif command == 'C3' and self.flag == 2:   #send halt
+                print("send exit halt data") 
                 self.send_exit_data(self.halt_data_res,3)
+                
                 self.flag = 0
         else:
             pass
             # print("Sequence not found")
             
+    # def read_data_enter(self):
+    #     while self.enter_running and self.EnterSerial:
+    #         try:
+    #             if data := self.EnterSerial.readline():
+    #                 print(data.hex())
+    #                 self.EnterApduHandle(data.hex(), self.sequence)
+    #         except serial.SerialException as e:
+    #             messagebox.showerror("Read data error:", e)
+
     def read_data_enter(self):
+        buffer = b''
+        last_receive_time = time.time()
         while self.enter_running and self.EnterSerial:
             try:
-                if data := self.EnterSerial.readline():
-                    self.EnterApduHandle(data.hex(), self.sequence)
+                data = self.EnterSerial.read(1024)  # 一次最多读取 1024 字节
+                if data:
+                    buffer += data
+                    last_receive_time = time.time()
+                else:
+                    if time.time() - last_receive_time > self.timeout_threshold:
+                        if buffer:
+                            hex_data = buffer.hex()
+                            # print(hex_data)
+                            self.EnterApduHandle(hex_data, self.sequence)
+                            buffer = b''
+                        last_receive_time = time.time()
+            except serial.SerialException as e:
+                messagebox.showerror("Read data error:", e)
+
+    def read_data_exit(self):
+        buffer = b''
+        last_receive_time = time.time()
+        while self.exit_running and self.ExitSerial:
+            try:
+                data = self.ExitSerial.read(1024)  # 一次最多读取 1024 字节
+                if data:
+                    buffer += data
+                    last_receive_time = time.time()
+                else:
+                    if time.time() - last_receive_time > self.timeout_threshold:
+                        if buffer:
+                            hex_data = buffer.hex()
+                            # print(hex_data)
+                            self.ExitApduHandle(hex_data, self.sequence)
+                            buffer = b''
+                        last_receive_time = time.time()
             except serial.SerialException as e:
                 messagebox.showerror("Read data error:", e)
     
-    def read_data_exit(self):
-        while self.exit_running and self.ExitSerial:
-            try:
-                if data := self.ExitSerial.readline():
-                    self.ExitApduHandle(data.hex(), self.sequence)
-            except serial.SerialException as e:
-                messagebox.showerror("Read data error:", str(e))
+    # def read_data_exit(self):
+    #     while self.exit_running and self.ExitSerial:
+    #         try:
+    #             if data := self.ExitSerial.readline():
+    #                 self.ExitApduHandle(data.hex(), self.sequence)
+    #         except serial.SerialException as e:
+    #             messagebox.showerror("Read data error:", str(e))
     
     def cacl_money(self, money):
         self.money = money
@@ -499,11 +541,12 @@ class UwbReaderAssistant:
                 if type == 2:
                     self.enter_write_data_res = "05FFFFFFFFFF06FFFFFFFFFF17C20115805401000F00000001"+self.DateTime
                 elif type == 3:
-                    self.show_in_text_area(str(self.enter_id) + " | " + datetime.now().strftime("%Y-%m-%d-%H:%M:%S") + " | " + "扣费: $" + str(int(self.money_entry.get(),16)/100) + " | " + "Enter OK")
+                    spendmsg = str(self.enter_id) + " | " + datetime.now().strftime("%Y-%m-%d-%H:%M:%S") + " | " + "消费: $" + str(int(self.money_entry.get(),16)/100) + " | " + "OK"
+                    if self.switch_var.get() == "on":
+                        spendmsg = str(self.enter_id) + " | " + datetime.now().strftime("%H:%M:%S") + " | " + "$" + str(int(self.money_entry.get(),16)/100) + " | " + "OK"
+                    self.show_in_text_area(spendmsg)
                     self.enter_id += 1
-                    print("------------------------------- OK -------------------------------")
-            else:
-                messagebox.showerror("Uart not opened:", e)
+                    print("-------------------------------ENTER OK -------------------------------")
         except ValueError as e:
             messagebox.showerror("Send data error:", e)     
     
@@ -519,22 +562,30 @@ class UwbReaderAssistant:
                 if type == 2:
                     self.exit_write_data_res = "05FFFFFFFFFF06FFFFFFFFFF17C20115805401000F00000001"+self.DateTime
                 elif type == 3:
-                    self.show_in_text_area1(str(self.exit_id) + " | " + datetime.now().strftime("%Y-%m-%d-%H:%M:%S") + "  |  " + "扣费: ￥" + str(int(self.money_exit.get(),16)/100) + "  |  " + "Exit OK")
+                    spendmsg = str(self.exit_id) + " | " + datetime.now().strftime("%Y-%m-%d-%H:%M:%S") + " | " + "消费: ￥" + str(int(self.money_exit.get(),16)/100) + " | " + "OK"
+                    if self.switch_var.get() == "on":
+                        spendmsg = str(self.exit_id) + " | " + datetime.now().strftime("%H:%M:%S") + " | " + "￥" + str(int(self.money_exit.get(),16)/100) + " | " + "OK"
+                    self.show_in_text_area1(spendmsg)
                     self.exit_id += 1
-                    print("------------------------------- OK -------------------------------")
-            else:
-                messagebox.showerror("Uart not opened:", e)
+                    print("-------------------------------EXIT OK -------------------------------")
         except ValueError as e:
             messagebox.showerror("Send data error:", e)
 
     def show_in_text_area(self, message):
-        print("enter show_in_text_area")
         self.text_area.insert(tk.END, message + "\n" + "\n")
         self.text_area.see(tk.END)
     
     def show_in_text_area1(self, message):
         self.text_area1.insert(tk.END, message + "\n" + "\n")
         self.text_area1.see(tk.END)
+
+    def toggle_topmost(self):
+        if self.switch_var.get() == "on":
+            self.master.wm_attributes("-topmost", 1)
+            self.master.geometry("550x320")
+        else:
+            self.master.wm_attributes("-topmost", 0)
+            self.master.geometry("900x450")
 
     def show_about(self):
         about_message = f"""
