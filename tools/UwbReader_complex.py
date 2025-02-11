@@ -7,6 +7,7 @@ import customtkinter
 from CTkTable import CTkTable
 import ctypes
 import time
+from PIL import Image
 import os
 import sys
 from tkinter import messagebox
@@ -25,6 +26,7 @@ class UwbReaderAssistant:
         self.master.geometry("900x450")
         icon_path = os.path.join(os.path.dirname(__file__), 'UWBReader.ico')
         self.master.wm_iconbitmap(icon_path)
+        # self.Init_image()
         self.my_lib = ctypes.WinDLL("./tools/libRSCode.dll")
         self.my_lib.initialize_ecc()
         self.my_lib.encode_data.argtypes = [ctypes.POINTER(ctypes.c_ubyte), ctypes.c_int, ctypes.POINTER(ctypes.c_ubyte)]
@@ -64,6 +66,8 @@ class UwbReaderAssistant:
             print(f'read_data_res: {self.read_data_res}')
 
         self.create_widgets()
+
+        self.update_ports_periodically()
     
     def update_read_data_res(self, type):
         industry_code_map = {
@@ -116,28 +120,18 @@ class UwbReaderAssistant:
         self.master.grid_rowconfigure(0, weight=0)
         self.master.grid_rowconfigure(2, weight=1)
 
-        self.port_options = self.get_serial_ports()
+        self.port_options = []
         self.port_var = tk.StringVar(self.master)
-        if self.port_options:  # 检查是否有可用的串口
-            self.port_var.set(self.port_options[0])  # 默认选择第一个串口
-        else:
-            self.port_var.set('')  # 如果没有串口，设置为空字符串
-        
-        self.port_options1 = self.get_serial_ports()
         self.port_var1 = tk.StringVar(self.master)
-        if self.port_options1:  # 检查是否有可用的串口
-            self.port_var1.set(self.port_options1[0])  # 默认选择第一个串口
-        else:
-            self.port_var1.set('')  # 如果没有串口，设置为空字符串
         
         self.baudrate_var = tk.IntVar(self.master, 460800)  # 默认波特率9600
         self.baudrate_var1 = tk.IntVar(self.master, 460800)  # 默认波特率9600
-
+        self.font = ["Roboto", "Times New Roman", "Segoe UI"]
         def create_label(master, text, column, row, columnspan, padx, pady):
             label_style = {
                 "corner_radius": 15,
-                "fg_color": "#E0E0E0",
-                "font": ("Roboto", 20, "bold"),
+                "fg_color": ("#E0E0E0", "#87CEEB"),
+                "font": ("Times New Roman", 20, "bold"),    # "Times New Roman"   Segoe UI  Roboto
                 "text_color": "#6A1B9A",
                 "anchor": "center"
             }
@@ -146,14 +140,14 @@ class UwbReaderAssistant:
             return label
 
         # 创建标题
-        self.port_label = create_label(self.master, "ENTER", 0, 0, 3, 75, 10)
-        self.port_label1 = create_label(self.master, "EXIT", 4, 0, 3, 75, 10)
+        self.port_label = create_label(self.master, "ENTER", 0, 0, 3, 75, (10,0))
+        self.port_label1 = create_label(self.master, "EXIT", 4, 0, 3, 75, (10,0))
 
         ## Tab ##
         TabColor = ("#E0F2F8","#AED6F1")
         TextColor = ("#663300", "#663300")
         self.EnterTab = customtkinter.CTkTabview(self.master, fg_color=TabColor, segmented_button_selected_color=("pink", "purple"))
-        self.EnterTab.grid(row=2, column=0, columnspan=3, rowspan=5, padx=10, pady=10,sticky='nsew')
+        self.EnterTab.grid(row=2, column=0, columnspan=3, rowspan=5, padx=10, pady=(10),sticky='nsew')
         self.EnterTab.add("COM")
         self.EnterTab.add("Setting")
         self.EnterTab.add("Enter")
@@ -174,6 +168,7 @@ class UwbReaderAssistant:
         ## Textbox ##
         self.text_area = customtkinter.CTkTextbox(EnterTabFrame, width=200, height=400,  fg_color=("#E6E6FF", "#A0C8CF"), text_color="black")
         self.text_area.pack(padx=1, pady=1, fill="both", expand=True)
+
         self.text_area1 = customtkinter.CTkTextbox(ExitTabFrame, width=200, height=400,  fg_color=("#E6E6FF", "#A0C8CF"), text_color="black")  
         self.text_area1.pack(padx=1, pady=1, fill="both", expand=True)
         
@@ -266,25 +261,30 @@ class UwbReaderAssistant:
 
         other_frame = customtkinter.CTkFrame(self.EnterTab.tab("COM"),fg_color= TabColor)
         other_frame.pack(padx=20, pady=10, fill="x")
+
         self.switch_var = customtkinter.StringVar(value="off")
         switch = customtkinter.CTkCheckBox(other_frame, text="Pin to Screen", command=self.toggle_topmost, variable=self.switch_var, onvalue="on", offvalue="off", text_color=TextColor)
-        switch.pack(side="left")
+        switch.pack(padx=(0, 10),pady=(0,10),fill="x")
 
-        info_label = customtkinter.CTkLabel(self.EnterTab.tab("COM"), text="仅授权小米内部使用", font=("Roboto", 16), text_color="red")
+        self.appearance_mode_menu = customtkinter.CTkOptionMenu(other_frame, values=["Light", "Dark", "System"], command=self.change_appearance_mode_event)
+        self.appearance_mode_menu.pack(side="left")
+
+        self.logo = customtkinter.CTkImage(light_image=Image.open(os.path.join(os.path.dirname(__file__), "logo.png")), size=(60, 40))
+        info_label = customtkinter.CTkLabel(self.EnterTab.tab("COM"), text="仅授权小米内部使用...", font=("Roboto", 16), text_color="red",image=self.logo, compound="left")
         info_label.pack(side="left", padx=20, pady=10)
 
         ## COM Exit ##
         port_frame1 = customtkinter.CTkFrame(self.ExitTab.tab("COM"),fg_color= TabColor)
         port_frame1.pack(padx=20, pady=10, fill="x")
         port_label1 = customtkinter.CTkLabel(port_frame1, text="COM选择 :", font=("Roboto", 15), text_color=TextColor)
-        port_label1.pack(side="left", padx=(0, 22))  # 左对齐，右侧留出一些间距
-        self.port_menu1 = customtkinter.CTkOptionMenu(port_frame1, variable=self.port_var1, values=[*self.port_options1], font=("Roboto", 15))
+        port_label1.pack(side="left", padx=(0, 22))  
+        self.port_menu1 = customtkinter.CTkOptionMenu(port_frame1, variable=self.port_var1, values=[*self.port_options], font=("Roboto", 15))
         self.port_menu1.pack(side="left")
 
         baudrate_frame1 = customtkinter.CTkFrame(self.ExitTab.tab("COM"),fg_color= TabColor)
         baudrate_frame1.pack(padx=20, pady=10, fill="x")
         baudrate_label1 = customtkinter.CTkLabel(baudrate_frame1, text="波特率选择 :", font=("Roboto", 15), text_color=TextColor)
-        baudrate_label1.pack(side="left", padx=(0, 10))  # 左对齐，右侧留出一些间距
+        baudrate_label1.pack(side="left", padx=(0, 10))  
         self.baudrate_menu1 = customtkinter.CTkOptionMenu(baudrate_frame1, variable=self.baudrate_var1, values=["460800", "115200", "3000000", "9600"], font=("Roboto", 15))
         self.baudrate_menu1.pack(side="left")
         # self.clear_button1 = customtkinter.CTkButton(self.ExitTab.tab("COM"), text="Clear", command=self.clear_text_area1, font=("Roboto", 15))
@@ -346,6 +346,7 @@ class UwbReaderAssistant:
                 self.read_thread_enter.start()
         except Exception as e:
             messagebox.showerror("Connect Uart error:", e)
+            self.segemented_button.set("Disconnect")
     
     def connect_exit(self):
         try:
@@ -357,6 +358,7 @@ class UwbReaderAssistant:
                 self.read_thread_exit.start()
         except Exception as e:
             messagebox.showerror("Connect Uart error:", e)
+            self.segemented_button1.set("Disconnect")
 
     def disconnect_enter(self):
         try:
@@ -375,6 +377,13 @@ class UwbReaderAssistant:
             self.read_thread_exit.join()
         if self.ExitSerial:
             self.ExitSerial.close()
+    
+    def on_window_closing(self):
+        if self.enter_running == True:
+            self.disconnect_enter()
+        if self.exit_running == True:
+            self.disconnect_exit()
+        self.master.destroy()
     
     def get_mac(self, write_data_res, type):
         try:
@@ -469,27 +478,18 @@ class UwbReaderAssistant:
         else:
             pass
             # print("Sequence not found")
-            
-    # def read_data_enter(self):
-    #     while self.enter_running and self.EnterSerial:
-    #         try:
-    #             if data := self.EnterSerial.readline():
-    #                 print(data.hex())
-    #                 self.EnterApduHandle(data.hex(), self.sequence)
-    #         except serial.SerialException as e:
-    #             messagebox.showerror("Read data error:", e)
 
     def read_data_enter(self):
         buffer = b''
         last_receive_time = time.time()
         while self.enter_running and self.EnterSerial:
             try:
-                data = self.EnterSerial.read(1024)  # 一次最多读取 1024 字节
+                data = self.EnterSerial.read(1024)
                 if data:
                     buffer += data
                     last_receive_time = time.time()
                 else:
-                    if time.time() - last_receive_time > self.timeout_threshold:
+                    if time.time() - last_receive_time > self.timeout_threshold:  #确保没有数据了再结束，如果没有这行，可能一次短暂的颜色就会导致异常结束了
                         if buffer:
                             hex_data = buffer.hex()
                             # print(hex_data)
@@ -504,7 +504,7 @@ class UwbReaderAssistant:
         last_receive_time = time.time()
         while self.exit_running and self.ExitSerial:
             try:
-                data = self.ExitSerial.read(1024)  # 一次最多读取 1024 字节
+                data = self.ExitSerial.read(1024)
                 if data:
                     buffer += data
                     last_receive_time = time.time()
@@ -518,14 +518,6 @@ class UwbReaderAssistant:
                         last_receive_time = time.time()
             except serial.SerialException as e:
                 messagebox.showerror("Read data error:", e)
-    
-    # def read_data_exit(self):
-    #     while self.exit_running and self.ExitSerial:
-    #         try:
-    #             if data := self.ExitSerial.readline():
-    #                 self.ExitApduHandle(data.hex(), self.sequence)
-    #         except serial.SerialException as e:
-    #             messagebox.showerror("Read data error:", str(e))
     
     def cacl_money(self, money):
         self.money = money
@@ -579,13 +571,46 @@ class UwbReaderAssistant:
         self.text_area1.insert(tk.END, message + "\n" + "\n")
         self.text_area1.see(tk.END)
 
+    def Init_image(self):
+        image_path = os.path.dirname(__file__) + "\\PIC"
+        self.enter_img = customtkinter.CTkImage(Image.open(os.path.join(image_path, "Enter.jpg")))
+        # self.exit_img = customtkinter.CTkImage(Image.open(os.path.join(image_path, "Exit.jpg")))
+    
+    def get_available_ports(self):
+        ports = serial.tools.list_ports.comports()
+        self.port_options = [port.device for port in ports]
+
+    def update_ports_periodically(self):
+        current_enter_selection = self.port_var.get()
+        current_exit_selection = self.port_var1.get()
+        self.get_available_ports()
+        self.port_menu.configure(values=self.port_options)
+        self.port_menu1.configure(values=self.port_options)
+
+        if current_enter_selection in self.port_options:
+            self.port_var.set(current_enter_selection)
+        elif self.port_options:
+            # 如果当前选择的串口不可用，选择第一个可用的串口
+            self.port_var.set(self.port_options[0])
+        
+        if current_exit_selection in self.port_options:
+            self.port_var1.set(current_exit_selection)
+        elif self.port_options:
+            # 如果当前选择的串口不可用，选择第一个可用的串口
+            self.port_var1.set(self.port_options[0])
+
+        self.master.after(3000, self.update_ports_periodically) # 每5秒更新一次
+
     def toggle_topmost(self):
         if self.switch_var.get() == "on":
             self.master.wm_attributes("-topmost", 1)
-            self.master.geometry("550x320")
+            self.master.geometry("550x315")
         else:
             self.master.wm_attributes("-topmost", 0)
             self.master.geometry("900x450")
+    
+    def change_appearance_mode_event(self, new_appearance_mode):
+        customtkinter.set_appearance_mode(new_appearance_mode)
 
     def show_about(self):
         about_message = f"""
@@ -613,17 +638,19 @@ if __name__ == "__main__":
     root = customtkinter.CTk()
     app = UwbReaderAssistant(root)
 
-    menubar = tk.Menu(root)  
+    menubar = tk.Menu(root, font=("Time New Roman", 15), background="black")  
     root.config(menu=menubar)
-
-    theme_menu = tk.Menu(menubar, tearoff=0)
-    menubar.add_cascade(label="主题", menu=theme_menu)
-    theme_menu.add_command(label="浅色模式", command=lambda: app.change_theme("light"))
-    theme_menu.add_command(label="深色模式", command=lambda: app.change_theme("dark"))
-    theme_menu.add_command(label="跟随系统", command=lambda: app.change_theme("System"))
+    
+    # theme_menu = tk.Menu(menubar, tearoff=0)
+    # menubar.add_cascade(label="主题", menu=theme_menu)
+    # theme_menu.add_command(label="浅色模式", command=lambda: app.change_theme("light"))
+    # theme_menu.add_command(label="深色模式", command=lambda: app.change_theme("dark"))
+    # theme_menu.add_command(label="跟随系统", command=lambda: app.change_theme("System"))
 
     about_menu = tk.Menu(menubar, tearoff=0)
     menubar.add_cascade(label="关于", menu=about_menu)
-    about_menu.add_command(label = "关于", command=app.show_about)
+    about_menu.add_command(label = "关于", command=app.show_about, font=(app.font[0], 15))
+    
+    root.protocol("WM_DELETE_WINDOW", app.on_window_closing)
 
     root.mainloop()
