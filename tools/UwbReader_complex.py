@@ -7,7 +7,7 @@ import customtkinter
 from CTkTable import CTkTable
 import ctypes
 import time
-from PIL import Image
+from PIL import Image,ImageTk
 import os
 import sys
 from tkinter import messagebox
@@ -20,13 +20,13 @@ from Algorithm.Ecb_Des import MyEcbDes
 class UwbReaderAssistant:
     def __init__(self, master):
         self.master = master
-        self.version = "_v1.0"
+        self.version = "_v1.1"
         self.master.title("UWBReader"+self.version)
         self.master.minsize(400, 200)
         self.master.geometry("900x450")
         icon_path = os.path.join(os.path.dirname(__file__), 'UWBReader.ico')
         self.master.wm_iconbitmap(icon_path)
-        # self.Init_image()
+        self.Init_image()
         self.my_lib = ctypes.WinDLL("./tools/libRSCode.dll")
         self.my_lib.initialize_ecc()
         self.my_lib.encode_data.argtypes = [ctypes.POINTER(ctypes.c_ubyte), ctypes.c_int, ctypes.POINTER(ctypes.c_ubyte)]
@@ -146,33 +146,41 @@ class UwbReaderAssistant:
         ## Tab ##
         TabColor = ("#E0F2F8","#AED6F1")
         TextColor = ("#663300", "#663300")
-        self.EnterTab = customtkinter.CTkTabview(self.master, fg_color=TabColor, segmented_button_selected_color=("pink", "purple"))
+        self.EnterTab = customtkinter.CTkTabview(self.master, fg_color=TabColor)
         self.EnterTab.grid(row=2, column=0, columnspan=3, rowspan=5, padx=10, pady=(10),sticky='nsew')
         self.EnterTab.add("COM")
         self.EnterTab.add("Setting")
-        self.EnterTab.add("Enter")
+        self.EnterTab.add("Log")
         self.EnterTab.set("COM")
 
-        self.ExitTab = customtkinter.CTkTabview(master=self.master, fg_color=TabColor, segmented_button_selected_color=("pink", "purple"))
+        self.ExitTab = customtkinter.CTkTabview(master=self.master, fg_color=TabColor)
         self.ExitTab.grid(row=2, column=4, columnspan=3, rowspan = 5, padx=10, pady=10,sticky='nsew')
         self.ExitTab.add("COM")
         self.ExitTab.add("Setting")
-        self.ExitTab.add("Exit")
+        self.ExitTab.add("Log")
         self.ExitTab.set("COM")
 
-        EnterTabFrame = customtkinter.CTkFrame(self.EnterTab.tab("Enter"))
+        EnterTabFrame = customtkinter.CTkFrame(self.EnterTab.tab("Log"))
         EnterTabFrame.pack(padx=20, pady=20, fill="both", expand=True)
-        ExitTabFrame = customtkinter.CTkFrame(self.ExitTab.tab("Exit"))
+        EnterTabFrame.grid_columnconfigure(0, weight=1)
+        EnterTabFrame.grid_rowconfigure(0, weight=1)
+        ExitTabFrame = customtkinter.CTkFrame(self.ExitTab.tab("Log"))
         ExitTabFrame.pack(padx=20, pady=20, fill="both", expand=True)
+        ExitTabFrame.grid_columnconfigure(0, weight=1)
+        ExitTabFrame.grid_rowconfigure(0, weight=1)
 
         ## Textbox ##
         self.text_area = customtkinter.CTkTextbox(EnterTabFrame, width=200, height=400,  fg_color=("#E6E6FF", "#A0C8CF"), text_color="black")
-        self.text_area.pack(padx=1, pady=1, fill="both", expand=True)
+        self.text_area.grid(row=0, column=0,padx=1, pady=1, sticky='nsew')
+        self.clear_button = customtkinter.CTkButton(EnterTabFrame, text="", command=self.clear_text_area, font=("Roboto", 15), image=self.delete_img)
+        self.clear_button.grid(row=1, column=0, padx=1, pady=1, sticky="ew")
 
         self.text_area1 = customtkinter.CTkTextbox(ExitTabFrame, width=200, height=400,  fg_color=("#E6E6FF", "#A0C8CF"), text_color="black")  
-        self.text_area1.pack(padx=1, pady=1, fill="both", expand=True)
+        self.text_area1.grid(row=0, column=0,padx=1, pady=1, sticky='nsew')
+        self.clear_button1 = customtkinter.CTkButton(ExitTabFrame, text="", command=self.clear_text_area1, font=("Roboto", 15), image=self.delete_img)
+        self.clear_button1.grid(row=1, column=0, padx=1, pady=1, sticky="ew")
         
-        ## Setting Enter ##
+        ## Setting ##
         industry_frame = customtkinter.CTkFrame(self.EnterTab.tab("Setting"),fg_color= TabColor)
         industry_frame.pack(padx=20, pady=10, fill="x")
         industry_code_label = customtkinter.CTkLabel(industry_frame, text="行业代码:", font=("Roboto", 15), text_color=TextColor)
@@ -205,7 +213,7 @@ class UwbReaderAssistant:
         self.money_entry.insert(0, "00000000")
         self.money_entry.pack(side="left")
 
-        ## Setting Exit ##
+        ## Setting ##
         industry_code_frame = customtkinter.CTkFrame(self.ExitTab.tab("Setting"),fg_color= TabColor)
         industry_code_frame.pack(padx=20, pady=10, fill="x")
         industry_code_label = customtkinter.CTkLabel(industry_code_frame, text="行业代码:", font=("Roboto", 15), text_color=TextColor)
@@ -253,9 +261,7 @@ class UwbReaderAssistant:
         self.baudrate_menu = customtkinter.CTkOptionMenu(baudrate_frame, variable=self.baudrate_var, values=["460800", "115200", "3000000", "9600"], font=("Roboto", 15))
         self.baudrate_menu.pack(side="left")
 
-        # self.clear_button = customtkinter.CTkButton(self.EnterTab.tab("COM"), text="Clear", command=self.clear_text_area, font=("Roboto", 15))
-        # self.clear_button.pack(padx=20,pady=10)
-        self.segemented_button = customtkinter.CTkSegmentedButton(self.EnterTab.tab("COM"), values=["Connect", "Disconnect"], command=self.segmented_button_callback, font=("Roboto", 15), selected_color=("pink", "purple"), width=200)
+        self.segemented_button = customtkinter.CTkSegmentedButton(self.EnterTab.tab("COM"), values=["Connect", "Disconnect"], command=self.segmented_button_callback, font=("Roboto", 15), width=200)
         self.segemented_button.pack(padx=20, pady=10, fill="x")
         self.segemented_button.set("Disconnect")
 
@@ -266,7 +272,7 @@ class UwbReaderAssistant:
         switch = customtkinter.CTkCheckBox(other_frame, text="Pin to Screen", command=self.toggle_topmost, variable=self.switch_var, onvalue="on", offvalue="off", text_color=TextColor)
         switch.pack(padx=(0, 10),pady=(0,10),fill="x")
 
-        self.appearance_mode_menu = customtkinter.CTkOptionMenu(other_frame, values=["Light", "Dark", "System"], command=self.change_appearance_mode_event)
+        self.appearance_mode_menu = customtkinter.CTkOptionMenu(other_frame, values=["Light", "Dark", "System", "About"], command=self.change_appearance_mode_event)
         self.appearance_mode_menu.pack(side="left")
 
         self.logo = customtkinter.CTkImage(light_image=Image.open(os.path.join(os.path.dirname(__file__), "logo.png")), size=(60, 40))
@@ -289,7 +295,7 @@ class UwbReaderAssistant:
         self.baudrate_menu1.pack(side="left")
         # self.clear_button1 = customtkinter.CTkButton(self.ExitTab.tab("COM"), text="Clear", command=self.clear_text_area1, font=("Roboto", 15))
         # self.clear_button1.pack(padx=20,pady=10 )
-        self.segemented_button1 = customtkinter.CTkSegmentedButton(self.ExitTab.tab("COM"), values=["Connect", "Disconnect"], command=self.segmented_button_callback1, font=("Roboto", 15), selected_color=("pink", "purple"), width=200)
+        self.segemented_button1 = customtkinter.CTkSegmentedButton(self.ExitTab.tab("COM"), values=["Connect", "Disconnect"], command=self.segmented_button_callback1, font=("Roboto", 15), width=200)
         self.segemented_button1.pack(padx=20, pady=10, fill="x")
         self.segemented_button1.set("Disconnect")
     
@@ -310,8 +316,10 @@ class UwbReaderAssistant:
         return hex_string
     
     def clear_text_area(self):
+        self.enter_id = 1
         self.text_area.delete(1.0, tk.END)  
     def clear_text_area1(self):
+        self.exit_id = 1
         self.text_area1.delete(1.0, tk.END)  
     
     def segmented_button_callback(self, value):
@@ -583,11 +591,6 @@ class UwbReaderAssistant:
     def show_in_text_area1(self, message):
         self.text_area1.insert(tk.END, message + "\n" + "\n")
         self.text_area1.see(tk.END)
-
-    def Init_image(self):
-        image_path = os.path.dirname(__file__) + "\\PIC"
-        self.enter_img = customtkinter.CTkImage(Image.open(os.path.join(image_path, "Enter.jpg")))
-        # self.exit_img = customtkinter.CTkImage(Image.open(os.path.join(image_path, "Exit.jpg")))
     
     def get_available_ports(self):
         ports = serial.tools.list_ports.comports()
@@ -625,7 +628,16 @@ class UwbReaderAssistant:
             self.master.geometry("900x450")
     
     def change_appearance_mode_event(self, new_appearance_mode):
-        customtkinter.set_appearance_mode(new_appearance_mode)
+        if new_appearance_mode == "About":
+            self.show_about()
+        else:
+            customtkinter.set_appearance_mode(new_appearance_mode)
+
+    def Init_image(self):
+        image_path = os.path.dirname(__file__) + "\\PIC"
+        self.delete_img = customtkinter.CTkImage(Image.open(os.path.join(image_path, "Delete.png")), size=(20, 20))
+        self.info_img = customtkinter.CTkImage(Image.open(os.path.join(image_path, "info.png")), size=(20, 20))
+        # self.car_img = customtkinter.CTkImage(Image.open(os.path.join(image_path, "car.mp4")), size=(20, 20))
 
     def show_about(self):
         about_message = f"""
@@ -662,9 +674,9 @@ if __name__ == "__main__":
     # theme_menu.add_command(label="深色模式", command=lambda: app.change_theme("dark"))
     # theme_menu.add_command(label="跟随系统", command=lambda: app.change_theme("System"))
 
-    about_menu = tk.Menu(menubar, tearoff=0)
-    menubar.add_cascade(label="关于", menu=about_menu)
-    about_menu.add_command(label = "关于", command=app.show_about, font=(app.font[0], 15))
+    # about_menu = tk.Menu(menubar, tearoff=0)
+    # menubar.add_cascade(label="关于", menu=about_menu)
+    # about_menu.add_command(label = "关于", command=app.show_about, font=(app.font[0], 15))
     
     root.protocol("WM_DELETE_WINDOW", app.on_window_closing)
 

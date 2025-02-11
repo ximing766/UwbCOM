@@ -1,40 +1,39 @@
-
-import tkinter as tk
-import ttkbootstrap as ttk
-from ttkbootstrap.icons import Emoji 
-import serial
-import threading
-from tkinter import scrolledtext
-from tkinter import messagebox
-import serial.tools.list_ports
-from PIL import Image, ImageTk
-import math
-import random
-import queue
-from collections import deque
-import time
-import warnings
-import json
 import re
-import requests
-from packaging import version
-import csv
 import os
 import sys
+import csv
+import math
+import time
+import json
+import queue
+import random
+import serial
 import logging
+import warnings
+import requests
+import threading
 import webbrowser
+import numpy as np
 import configparser
+import tkinter as tk
+import ttkbootstrap as ttk
+import serial.tools.list_ports
 import matplotlib.pyplot as plt
+from packaging import version
+from collections import deque
+from tkinter import messagebox
+from PIL import Image, ImageTk
+from tkinter import scrolledtext
+from ttkbootstrap.icons import Emoji 
+from sklearn.linear_model import ElasticNet
+from Plot.UwbParameterPlot import MultiPlotter
+from Algorithm.KF_classify import KalmanFilter
 from sklearn.linear_model import LinearRegression
 from sklearn.preprocessing import PolynomialFeatures
-from sklearn.linear_model import ElasticNet
-import numpy as np
-from Plot.UwbParameterPlot import MultiPlotter
-from Algorithm.lift_uwb_dynamic_detect_plan import UWBLiftAnimationPlan1,UWBLiftAnimationPlan2
-from Algorithm.KF_classify import KalmanFilter
-from Algorithm.location.ultdoa_dynamic_location import CoordinatePlotter
 from Algorithm.location.Chan_lse import ChanALG_LSE
 from Algorithm.location.Chan_equation import ChanEALG
+from Algorithm.location.ultdoa_dynamic_location import CoordinatePlotter
+from Algorithm.lift_uwb_dynamic_detect_plan import UWBLiftAnimationPlan1,UWBLiftAnimationPlan2
 
 class SerialAssistant:
     def __init__(self, master, log):

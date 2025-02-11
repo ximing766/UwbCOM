@@ -76,6 +76,10 @@
   {
    "optionDest": "datas",
    "value": "E:/Work/UWB/Code/UwbCOMCode/tools/logo.png;."
+  },
+  {
+   "optionDest": "datas",
+   "value": "E:/Work/UWB/Code/UwbCOMCode/tools/PIC;PIC/"
   }
  ],
  "nonPyinstallerOptions": {
