@@ -38,7 +38,7 @@ class App(customtkinter.CTk):
         self.navigation_frame_label.grid(row=0, column=0, padx=20, pady=20)
 
         self.page_home_button = customtkinter.CTkButton(self.navigation_frame, corner_radius=0, height=40, border_spacing=10, text="Home",fg_color="transparent", 
-                                                   anchor="w", command=self.page_home_button_event, font=customtkinter.CTkFont(size=12, weight="bold"))
+                                                   anchor="w", command=self.page_home_button_event, font=customtkinter.CTkFont(size=12, weight="bold"), image=self.my_ico)
         self.page_home_button.grid(row=1, column=0, sticky="ew")
 
         self.page_2_button = customtkinter.CTkButton(self.navigation_frame, corner_radius=0, height=40, border_spacing=10, text="Frame 2",fg_color="transparent", 
@@ -55,7 +55,7 @@ class App(customtkinter.CTk):
     def create_home_page(self):
         self.home_frame = ctk.CTkFrame(self.RootFrame, corner_radius=0, fg_color="transparent")
         self.home_frame.grid_columnconfigure(0, weight=1)
-        self.home_frame_large_image_label = ctk.CTkLabel(self.home_frame, text="",image = self.large_test_image)
+        self.home_frame_large_image_label = ctk.CTkLabel(self.home_frame, text="Home page", font=ctk.CTkFont(size=20, weight="bold"))
         self.home_frame_large_image_label.grid(row=0, column=0, padx=20, pady=10)
 
         # 添加 CTkScrollableFrame
@@ -127,6 +127,7 @@ class App(customtkinter.CTk):
     def Init_image(self):
         image_path = os.path.dirname(__file__) + "\\test_images"
         self.large_test_image = customtkinter.CTkImage(Image.open(os.path.join(image_path, "HomePage.png")), size=(500, 150))
+        self.my_ico = customtkinter.CTkImage(Image.open("E:\\Work\\UWB\\Code\\UwbCOMCode\\PIC\\my.png"), size=(32, 32))
 
 
 if __name__ == "__main__":

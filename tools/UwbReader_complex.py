@@ -315,12 +315,14 @@ class UwbReaderAssistant:
         self.text_area1.delete(1.0, tk.END)  
     
     def segmented_button_callback(self, value):
+        print(f"enter callback of segmented button: {value}")
         if value == "Connect":
             self.connect_enter()
         elif value == "Disconnect":
             self.disconnect_enter()
 
     def segmented_button_callback1(self, value):
+        print(f"exit callback of segmented button: {value}")
         if value == "Connect":
             self.connect_exit()
         elif value == "Disconnect":
@@ -335,7 +337,7 @@ class UwbReaderAssistant:
             messagebox.showerror("Request Uart List error:", e)
         return ports
 
-    def connect_enter(self):
+    def connect_enter(self): 
         try:
             if self.port_var.get():
                 self.EnterSerial = serial.Serial(self.port_var.get(), self.baudrate_var.get(), timeout=0.1)
@@ -459,7 +461,8 @@ class UwbReaderAssistant:
                 self.CardNo = data_upper[index+122:index+142]
                 if self.update_read_data_res(1) != 0:
                     print("send exit read data")  
-                    self.send_exit_data(self.exit_read_data_res,1)    
+                    self.send_exit_data(self.exit_read_data_res,1)
+                    # print(f"data={self.exit_read_data_res}")
                     self.flag = 1
             elif command == 'C3' and self.flag == 1:   #send 8054
                 self.balance = data_upper[index+34:index+42]
@@ -498,6 +501,11 @@ class UwbReaderAssistant:
                         last_receive_time = time.time()
             except serial.SerialException as e:
                 messagebox.showerror("Read data error:", e)
+                self.segemented_button.set("Disconnect")
+                self.segmented_button_callback("Disconnect")
+
+            except Exception as e:
+                messagebox.showerror("Unexpected error:", e)
 
     def read_data_exit(self):
         buffer = b''
@@ -518,6 +526,11 @@ class UwbReaderAssistant:
                         last_receive_time = time.time()
             except serial.SerialException as e:
                 messagebox.showerror("Read data error:", e)
+                self.segemented_button1.set("Disconnect")
+                self.segmented_button_callback1("Disconnect")
+
+            except Exception as e:
+                messagebox.showerror("Unexpected error:", e)
     
     def cacl_money(self, money):
         self.money = money
@@ -578,14 +591,16 @@ class UwbReaderAssistant:
     
     def get_available_ports(self):
         ports = serial.tools.list_ports.comports()
+        self.old_port_options = self.port_options
         self.port_options = [port.device for port in ports]
 
     def update_ports_periodically(self):
         current_enter_selection = self.port_var.get()
         current_exit_selection = self.port_var1.get()
         self.get_available_ports()
-        self.port_menu.configure(values=self.port_options)
-        self.port_menu1.configure(values=self.port_options)
+        if self.old_port_options != self.port_options:
+            self.port_menu.configure(values=self.port_options)
+            self.port_menu1.configure(values=self.port_options)
 
         if current_enter_selection in self.port_options:
             self.port_var.set(current_enter_selection)
@@ -599,7 +614,7 @@ class UwbReaderAssistant:
             # 如果当前选择的串口不可用，选择第一个可用的串口
             self.port_var1.set(self.port_options[0])
 
-        self.master.after(3000, self.update_ports_periodically) # 每5秒更新一次
+        self.master.after(3000, self.update_ports_periodically) # 每5秒更新一次  #TODO：连接串口时拔掉串口会导致程序卡死
 
     def toggle_topmost(self):
         if self.switch_var.get() == "on":
