@@ -31,7 +31,7 @@
     "corner_radius": 6,
     "border_width": 0,
     "fg_color": [
-      "#399cff",
+      "#66b3ff",
       "#8080c0"
     ],
     "hover_color": [
@@ -218,23 +218,23 @@
     "corner_radius": 4,
     "border_width": 1,
     "fg_color": [
-      "#313B6E",
+      "#acacac",
       "#57639D"
     ],
     "selected_color": [
-      "#8080ff",
+      "#66b3ff",
       "#ff5eae"
     ],
     "selected_hover_color": [
-      "#ffc4ff",
+      "#1e8eff",
       "#ff80ff"
     ],
     "unselected_color": [
-      "#505693",
+      "#acacac",
       "#39406e"
     ],
     "unselected_hover_color": [
-      "#1c3854",
+      "#818181",
       "#5963B6"
     ],
     "text_color": [
@@ -242,7 +242,7 @@
       "#ffffff"
     ],
     "text_color_disabled": [
-      "#bbbbbb",
+      "#acacac",
       "#bbbbbb"
     ]
   },
@@ -312,7 +312,7 @@
     "date created": "Feb 06 2025 17:28:13",
     "last modified by": "QLL",
     "created with": "CTk Theme Builder v3.1.0",
-    "last modified": "Feb 10 2025 15:00:42",
+    "last modified": "Feb 12 2025 10:37:50",
     "keystone colour": "#57639D",
     "harmony method": "Complementary",
     "harmony differential": 5,

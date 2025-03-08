@@ -17,20 +17,20 @@ import numpy as np
 import configparser
 import tkinter as tk
 import ttkbootstrap as ttk
-import serial.tools.list_ports
-import matplotlib.pyplot as plt
 from packaging import version
 from collections import deque
 from tkinter import messagebox
 from PIL import Image, ImageTk
+import serial.tools.list_ports
+import matplotlib.pyplot as plt
 from tkinter import scrolledtext
 from ttkbootstrap.icons import Emoji 
 from sklearn.linear_model import ElasticNet
 from Plot.UwbParameterPlot import MultiPlotter
 from Algorithm.KF_classify import KalmanFilter
 from sklearn.linear_model import LinearRegression
-from sklearn.preprocessing import PolynomialFeatures
 from Algorithm.location.Chan_lse import ChanALG_LSE
+from sklearn.preprocessing import PolynomialFeatures
 from Algorithm.location.Chan_equation import ChanEALG
 from Algorithm.location.ultdoa_dynamic_location import CoordinatePlotter
 from Algorithm.lift_uwb_dynamic_detect_plan import UWBLiftAnimationPlan1,UWBLiftAnimationPlan2
@@ -39,7 +39,7 @@ class SerialAssistant:
     def __init__(self, master, log):
         self.master = master
         self.log = log
-        self.version = "V1.4.5"
+        self.version = "V1.4.6"
         self.view = "default"                                 # view没创建为单独的类，这里只能共用一个再去区分了
         self.master.title("UwbCOM " + self.version)
         self.master.minsize(850, 835)
@@ -99,6 +99,8 @@ class SerialAssistant:
             "KF"            : KalmanFilter(0.5, 2, 2), 
             "KF_predict"    : [0, 0],
             "speed"         : deque(maxlen=4),
+            "Auth"          : 0,
+            "Trans"         : 0,
         } for _ in range(20)]  
         #self.distance_list = [self.initial_dict.copy() for _ in range(20)]  #初始化20个用户的数据
         self.user_oval     = {}
@@ -111,6 +113,7 @@ class SerialAssistant:
         # print(Emoji._ITEMS)
         self.face                 = Emoji.get("winking face")
         self.table_columns        = ('ID','User','nLos','D-Master','D-Slaver','D-Gate','Speed','x','y','z')
+        self.log_feature          = ('Auth','Trans')
         self.PosInfo              = "@POSI"
         self.CardInfo             = "@CARD"
         self.pos_pattern          = re.compile(self.PosInfo)
@@ -152,6 +155,7 @@ class SerialAssistant:
         self.move_times           = 0
         self.x_move               = 0
         self.y_move               = 0
+        # self.model                = tf.keras.models.load_model('hone_scence_model.keras')
 
         self.create_widgets(self.view)
 
@@ -243,7 +247,8 @@ class SerialAssistant:
         self.text_area1 = ttk.Entry(frame_settings,width=entry_width,bootstyle="info")
         self.text_area1.grid(row=0, column=3, padx=5, pady=5, sticky='nsew')
         
-        other_Button    = ttk.Button(frame_settings, text="有效期", command=lambda:self.send_data(22222), width=button_width,bootstyle="primary").grid(row=1, column=4, padx=5, pady=5,sticky='nsew')
+        other_Button    = ttk.Button(frame_settings, text="有效期", command=self.toggle_call_status, width=button_width,bootstyle="primary")
+        other_Button.grid(row=1, column=4, padx=5, pady=5,sticky='nsew')
         self.text_area2 = ttk.Entry(frame_settings,width=entry_width,bootstyle="info")
         self.text_area2.grid(row=1, column=3, padx=5, pady=5, sticky='nsew') 
         
@@ -418,13 +423,14 @@ class SerialAssistant:
         self.notebook.add(self.canvas_frame, text = 'canvas')
         self.canvas_frame.grid_columnconfigure(0, weight=1)
 
-        # self.other_frame = ttk.Frame(self.notebook)
-        # self.notebook.add(self.other_frame, text = 'others')
-        # self.other_frame.grid_columnconfigure(0, weight=1)
+        # self.phone_frame = ttk.Frame(self.notebook)
+        # self.notebook.add(self.phone_frame, text = 'phone')
+        # self.phone_frame.grid_columnconfigure(0, weight=1)
 
         self.canvas = tk.Canvas(self.canvas_frame,bg="white",height=390)
         self.canvas.grid(row=0, column=0, padx=5, pady=5,sticky='nsew')
         self.master.grid_columnconfigure(0, weight=1)
+        
 
         '''
         others
@@ -536,7 +542,7 @@ class SerialAssistant:
             self.update_Table()
             self.update_serial_button()
             self.log.add_filehandler()
-            self.log.info(', '.join(self.table_columns))
+            self.log.info(', '.join(self.table_columns+self.log_feature)) # 写入Log表头
             self.log_number = 0
 
         except Exception as e:
@@ -581,7 +587,7 @@ class SerialAssistant:
                                 json_data = json.loads(match.group(0))
                         except json.JSONDecodeError as e:
                             print("Error decoding JSON:", e)
-                            pass
+                            continue
                         idx = json_data['idx']
                         if 0 <= idx < len(self.distance_list):
                             self.distance_list[idx]['MasterDistance'] = json_data.get('Master')
@@ -589,7 +595,9 @@ class SerialAssistant:
                             self.distance_list[idx]['GateDistance']   = json_data.get('Gate')
                             self.distance_list[idx]['nLos']           = json_data.get('nLos')
                             self.distance_list[idx]['lift_deep']      = json_data.get('LiftDeep')
-                            if json_data['User-Z'] !=0:
+                            self.distance_list[idx]['Auth']           = json_data.get('Auth')
+                            self.distance_list[idx]['Trans']          = json_data.get('Trans')
+                            if json_data['User-Z'] != 0:
                                 self.Use_AOA = True
                             self.x_offset = 200 if self.Use_AOA else 400
                             self.distance_list[idx]['CoorX_Arr']   = np.append(self.distance_list[idx]['CoorX_Arr'], self.x_offset + json_data.get('User-X'))
@@ -625,9 +633,9 @@ class SerialAssistant:
 
                         self.table_one_data = (idx, self.distance_list[idx]['nLos'], self.distance_list[idx]['MasterDistance'], self.distance_list[idx]['SlaverDistance'], \
                                            self.distance_list[idx]['GateDistance'], json_data['Speed'], data_x, int(self.y-60), int(self.z))
-                        self.table_1s_data.append(self.table_one_data)
-                        log_data = (self.log_number,) + self.table_one_data
-                        self.log.info(', '.join(map(str, log_data)))
+                        self.table_1s_data.append(self.table_one_data)  #  Table 秒级更新
+                        log_data = (self.log_number,) + self.table_one_data + (self.distance_list[idx]['Auth'] , self.distance_list[idx]['Trans'])
+                        self.log.info(', '.join(map(str, log_data)))    #  log 实时更新
                         self.log_number += 1
 
                         if self.Use_KF == True:  
@@ -892,9 +900,25 @@ class SerialAssistant:
         self.distance_list[idx]['Start_Y'] = round(user[1])
         self.distance_list[idx]['Start_X_AOA'] = round(user[1]) + 440
         self.distance_list[idx]['Start_Y_AOA'] = 250 - self.z
+    
+    def toggle_call_status(self):
+        if not self.canvas.find_withtag('status_circle') or not self.canvas.find_withtag('status_text'):
+            return
+        
+        current_color = self.canvas.itemcget(self.canvas.find_withtag('status_circle')[0], 'fill')
+        
+        if current_color == 'red':
+            self.canvas.itemconfig(self.canvas.find_withtag('status_circle'), fill='blue', outline='blue')
+            self.canvas.itemconfig(self.canvas.find_withtag('status_text'), text='打电话场景', fill='blue')
+        else:
+            self.canvas.itemconfig(self.canvas.find_withtag('status_circle'), fill='red', outline='red')
+            self.canvas.itemconfig(self.canvas.find_withtag('status_text'), text='非打电话场景', fill='red')
 
     def draw_basic(self, idx):
         self.canvas.delete("all")
+        self.canvas.create_oval(40, 40, 60, 60, fill='red', outline='red', width=2, tags = 'status_circle')  # 红色圆形
+        self.canvas.create_text(50, 70, text="非打电话场景", font=("Microsoft YaHei", 10), 
+                              fill='red', anchor='n', tags = 'status_text')
         # AOA
         if self.Use_AOA == True:
             # 绘制闸机(left)  以400为x原点，右下角坐标:[400-self.Master2SlverDistance/2,60]  左上角坐标[(400-self.Master2SlverDistance/2-30),10]
@@ -1145,13 +1169,13 @@ class SerialAssistant:
                                     file.write(chunk)
                             messagebox.showinfo("update", f"更新完成:{asset['name']}")
                         else:
-                            messagebox.showinfo("update", "下载失败")
+                            messagebox.showerror("update", "下载失败")
                 else:
-                    messagebox.showinfo("update", "取消更新")
+                    messagebox.showerror("update", "取消更新")
             else:
-                messagebox.showinfo("update", "已是最新版本")
+                messagebox.showerror("update", "已是最新版本")
         else:
-            print("Failed to retrieve release data")
+            messagebox.showerror("update", "please check your network")
 
     def show_about(self):
         messagebox.showinfo("关于", f"UwbCOM {self.version}\n\n"

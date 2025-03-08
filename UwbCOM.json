@@ -23,7 +23,7 @@
   },
   {
    "optionDest": "name",
-   "value": "UWBCOM_V1.4.3"
+   "value": "UWBCOM_V1.4.6"
   },
   {
    "optionDest": "clean_build",
@@ -64,6 +64,10 @@
   {
    "optionDest": "datas",
    "value": "E:/Work/UWB/Code/UwbCOMCode/logo.png;."
+  },
+  {
+   "optionDest": "datas",
+   "value": "E:/Work/UWB/Code/UwbCOMCode/config;config/"
   }
  ],
  "nonPyinstallerOptions": {
