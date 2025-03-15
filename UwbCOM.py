@@ -39,7 +39,7 @@ class SerialAssistant:
     def __init__(self, master, log):
         self.master = master
         self.log = log
-        self.version = "V1.4.6"
+        self.version = "V1.4.6.1"
         self.view = "default"                                 # view没创建为单独的类，这里只能共用一个再去区分了
         self.master.title("UwbCOM " + self.version)
         self.master.minsize(850, 835)
@@ -112,7 +112,7 @@ class SerialAssistant:
         #Emoji._ITEMS[i].name                               "🤨"
         # print(Emoji._ITEMS)
         self.face                 = Emoji.get("winking face")
-        self.table_columns        = ('ID','User','nLos','D-Master','D-Slaver','D-Gate','Speed','x','y','z')
+        self.table_columns        = ('ID','User','nLos','D-Master','D-Slaver','D-Gate','Speed','x','y','z','Auth','Trans')
         self.log_feature          = ('Auth','Trans')
         self.PosInfo              = "@POSI"
         self.CardInfo             = "@CARD"
@@ -271,6 +271,7 @@ class SerialAssistant:
             txt_label = "仅授权小米内部使用" if view == 'xiaomi' else "xxxxxx"
             self.txt_label = ttk.Label(frame_settings, text=txt_label,font=("Arial", 8),bootstyle="dark")
             self.txt_label.grid(row=1, column=7, columnspan=2,rowspan=1, padx=5, pady=5,sticky='nsew')
+
         
         '''
         description: 通信区域
@@ -278,20 +279,19 @@ class SerialAssistant:
         # 通信区总框架
         frame_comm = ttk.LabelFrame(self.master, text=f'{Emoji._ITEMS[1160]}{Emoji._ITEMS[1160]}{Emoji._ITEMS[1160]}',width = 900 ,height=250, bootstyle="info")
         frame_comm.grid(row=1, column=0, padx=5, pady=5,sticky='nsew')
-        frame_comm.grid_columnconfigure(0, weight=1)
+        frame_comm.grid_columnconfigure(0, weight=5)
         frame_comm.grid_columnconfigure(1, weight=1)
         frame_comm.grid_rowconfigure(0, weight=1)
         frame_comm.grid_propagate(False)  # 防止父容器根据子控件的大小自动调整自身大小
         
         # 总框架左侧单独一个表格
-
-        frame_comm_L = ttk.Frame(frame_comm,height=10,width=600)        
+        frame_comm_L = ttk.Frame(frame_comm,height=10)        
         frame_comm_L.grid(row=0, column=0, padx=1, pady=1,sticky='nsew')
         frame_comm_L.grid_rowconfigure(0,weight=1)
         frame_comm_L.grid_columnconfigure(0, weight=1)
         
         self.Table = ttk.Treeview(frame_comm_L, columns=self.table_columns,show='headings',bootstyle="info")
-        self.Table.tag_configure('oddrow', background='#ECECEC')
+        self.Table.tag_configure('oddrow', background='#d7eaf3')
         self.Table.tag_configure('evenrow', background='#FFFFFF')
 
         for col in self.table_columns:
@@ -300,7 +300,7 @@ class SerialAssistant:
         self.Table.grid(row=0, column=0, padx=1, pady=1,sticky='nsew')
         
         # 总框架右侧子总框
-        frame_comm_R = ttk.Frame(frame_comm,height=10,width=300)        
+        frame_comm_R = ttk.Frame(frame_comm,height=10)        
         frame_comm_R.grid(row=0, column=1, padx=1, pady=1,sticky='nsew')
         frame_comm_R.grid_rowconfigure(0,weight=1)
         frame_comm_R.grid_rowconfigure(1,weight=1)
@@ -308,35 +308,44 @@ class SerialAssistant:
 
         # 子总框上侧功能框
         frame_comm_R_Top_height = 5
-        frame_comm_R_Top        = ttk.Frame(frame_comm_R,width=300,height=frame_comm_R_Top_height)
+        frame_comm_R_Top        = ttk.Frame(frame_comm_R, height=frame_comm_R_Top_height)
         frame_comm_R_Top.grid(row=0, column=0, padx=1, pady=1,sticky='nsew')
-        frame_comm_R_Top.grid_rowconfigure(0,weight=1)
-        frame_comm_R_Top.grid_rowconfigure(1,weight=1)
-        frame_comm_R_Top.grid_columnconfigure(0, weight=1)   
-        frame_comm_R_Top.grid_columnconfigure(1, weight=1)
-        frame_comm_R_Top.grid_columnconfigure(2, weight=1)
+        frame_comm_R_Top.grid_columnconfigure(0, weight=1)
+        for i in range(8):  # 为8个按钮配置行权重
+            frame_comm_R_Top.grid_rowconfigure(i, weight=1)
+        
+        # # 设置frame的propagate为False，防止自动调整大小
+        # frame_comm_R_Top.grid_propagate(False)
 
         clear_bt = ttk.Button(frame_comm_R_Top, text="清除", command=lambda:self.on_ClearWindow(),bootstyle="success-outline")
-        clear_bt.grid(row=0, column=0, padx=1, pady=3,sticky='ew')
-        
-        save_bt = ttk.Button(frame_comm_R_Top, text="...", bootstyle="success-outline", state="disabled")
-        save_bt.grid(row=1, column=0, padx=1, pady=3,sticky='ew')
+        clear_bt.grid(row=0, column=0, padx=1, pady=1,sticky='ew')
 
         Check_bt1 = ttk.Button(frame_comm_R_Top, text="Distance", command=lambda:self.on_checkbutton_click_distance(), bootstyle="success-outline")
-        Check_bt1.grid(row=0, column=1, padx=1, pady=3,sticky='ew')
+        Check_bt1.grid(row=1, column=0, padx=1, pady=1,sticky='ew')
 
         Check_bt2 = ttk.Button(frame_comm_R_Top, text="Speed", command=lambda:self.on_checkbutton_click_speed(), bootstyle="success-outline")
-        Check_bt2.grid(row=1, column=1, padx=1, pady=3,sticky='ew')
+        Check_bt2.grid(row=2, column=0, padx=1, pady=1,sticky='ew')
 
         Check_bt3 = ttk.Button(frame_comm_R_Top, text="X-Y-Z", command=lambda:self.on_checkbutton_click_xyz(), bootstyle="success-outline")
-        Check_bt3.grid(row=0, column=2, padx=1, pady=3,sticky='ew')
+        Check_bt3.grid(row=3, column=0, padx=1, pady=1,sticky='ew')
 
-        Check_bt4 = ttk.Button(frame_comm_R_Top, text="...", command=lambda:self.on_checkbutton_click_xyz(), bootstyle="success-outline",state="disabled")
-        Check_bt4.grid(row=1, column=2, padx=1, pady=3,sticky='ew')
+        Check_bt4 = ttk.Button(frame_comm_R_Top, text="Reserved1", state="disabled", bootstyle="success-outline")
+        Check_bt4.grid(row=4, column=0, padx=1, pady=1,sticky='ew')
+
+        Check_bt5 = ttk.Button(frame_comm_R_Top, text="Reserved2", state="disabled", bootstyle="success-outline")
+        Check_bt5.grid(row=5, column=0, padx=1, pady=1,sticky='ew')
+
+        Check_bt6 = ttk.Button(frame_comm_R_Top, text="Reserved3", state="disabled", bootstyle="success-outline")
+        Check_bt6.grid(row=6, column=0, padx=1, pady=1,sticky='ew')
+
+        Check_bt7 = ttk.Button(frame_comm_R_Top, text="Reserved4", state="disabled", bootstyle="success-outline")
+        Check_bt7.grid(row=7, column=0, padx=1, pady=1,sticky='ew')
+
+
 
         # 子总框下侧功能框(更具进度条的值，更新演示图中电梯的高度和深度,半径)
         frame_comm_R_Bottom = ttk.LabelFrame(frame_comm_R, width=300, height=15,text="demonstration",bootstyle="info")
-        frame_comm_R_Bottom.grid(row=1, column=0, padx=1, pady=1,sticky='nsew')
+        # frame_comm_R_Bottom.grid(row=1, column=0, padx=1, pady=1,sticky='nsew')
         frame_comm_R_Bottom.grid_rowconfigure(0,weight=1)
         frame_comm_R_Bottom.grid_rowconfigure(1,weight=1)
         frame_comm_R_Bottom.grid_rowconfigure(2,weight=1)
@@ -469,6 +478,8 @@ class SerialAssistant:
         self.Table.column('x',width=50, anchor='w')
         self.Table.column('y',width=50, anchor='w')
         self.Table.column('z',width=50, anchor='w')
+        self.Table.column('Auth',width=50, anchor='w')
+        self.Table.column('Trans',width=50, anchor='w')
         
 
     def update_serial_button(self):
@@ -542,7 +553,7 @@ class SerialAssistant:
             self.update_Table()
             self.update_serial_button()
             self.log.add_filehandler()
-            self.log.info(', '.join(self.table_columns+self.log_feature)) # 写入Log表头
+            self.log.info(', '.join(self.table_columns)) # 写入Log表头
             self.log_number = 0
 
         except Exception as e:
@@ -632,9 +643,9 @@ class SerialAssistant:
                             data_x = int(self.x - 400)
 
                         self.table_one_data = (idx, self.distance_list[idx]['nLos'], self.distance_list[idx]['MasterDistance'], self.distance_list[idx]['SlaverDistance'], \
-                                           self.distance_list[idx]['GateDistance'], json_data['Speed'], data_x, int(self.y-60), int(self.z))
+                                           self.distance_list[idx]['GateDistance'], json_data['Speed'], data_x, int(self.y-60), int(self.z), json_data.get('Auth'), json_data.get('Trans'))
                         self.table_1s_data.append(self.table_one_data)  #  Table 秒级更新
-                        log_data = (self.log_number,) + self.table_one_data + (self.distance_list[idx]['Auth'] , self.distance_list[idx]['Trans'])
+                        log_data = (self.log_number,) + self.table_one_data  #+ (self.distance_list[idx]['Auth'] , self.distance_list[idx]['Trans'])
                         self.log.info(', '.join(map(str, log_data)))    #  log 实时更新
                         self.log_number += 1
 
@@ -902,6 +913,7 @@ class SerialAssistant:
         self.distance_list[idx]['Start_Y_AOA'] = 250 - self.z
     
     def toggle_call_status(self):
+        pass
         if not self.canvas.find_withtag('status_circle') or not self.canvas.find_withtag('status_text'):
             return
         
@@ -916,9 +928,9 @@ class SerialAssistant:
 
     def draw_basic(self, idx):
         self.canvas.delete("all")
-        self.canvas.create_oval(40, 40, 60, 60, fill='red', outline='red', width=2, tags = 'status_circle')  # 红色圆形
-        self.canvas.create_text(50, 70, text="非打电话场景", font=("Microsoft YaHei", 10), 
-                              fill='red', anchor='n', tags = 'status_text')
+        # self.canvas.create_oval(40, 40, 60, 60, fill='red', outline='red', width=2, tags = 'status_circle')  # 红色圆形
+        # self.canvas.create_text(50, 70, text="非打电话场景", font=("Microsoft YaHei", 10), 
+        #                       fill='red', anchor='n', tags = 'status_text')
         # AOA
         if self.Use_AOA == True:
             # 绘制闸机(left)  以400为x原点，右下角坐标:[400-self.Master2SlverDistance/2,60]  左上角坐标[(400-self.Master2SlverDistance/2-30),10]

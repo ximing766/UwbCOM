@@ -80,6 +80,10 @@
   {
    "optionDest": "datas",
    "value": "E:/Work/UWB/Code/UwbCOMCode/tools/PIC;PIC/"
+  },
+  {
+   "optionDest": "datas",
+   "value": "E:/Work/UWB/Code/UwbCOMCode/tools/update.html;."
   }
  ],
  "nonPyinstallerOptions": {

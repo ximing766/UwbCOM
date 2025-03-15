@@ -4,7 +4,6 @@ import serial.tools.list_ports
 import threading
 import ttkbootstrap as ttk
 import customtkinter
-from CTkTable import CTkTable
 import ctypes
 import time
 from PIL import Image,ImageTk
@@ -38,7 +37,7 @@ class UwbReaderAssistant:
         self.ExitSerial = None
         self.enter_running = False
         self.exit_running = False
-        self.timeout_threshold = 0.5
+        self.timeout_threshold = 0.1
         self.enter_id = 1
         self.exit_id = 1
         self.flag = 0
@@ -271,10 +270,24 @@ class UwbReaderAssistant:
 
         self.switch_var = customtkinter.StringVar(value="off")
         switch = customtkinter.CTkCheckBox(other_frame, text="Pin to Screen", command=self.toggle_topmost, variable=self.switch_var, onvalue="on", offvalue="off", text_color=TextColor)
-        switch.pack(padx=(0, 10),pady=(0,10),fill="x")
+        switch.pack(side="left", padx=(0, 10), pady=(0,10))
+        
+        # 添加E1检查开关
+        self.e1_check_var = customtkinter.StringVar(value="on")
+        e1_check_switch = customtkinter.CTkCheckBox(other_frame, text="1E检查", variable=self.e1_check_var, onvalue="on", offvalue="off", text_color=TextColor)
+        e1_check_switch.pack(side="left", padx=(0, 0), pady=(0,10))
+        
+        # 创建新的一行框架
+        appearance_frame = customtkinter.CTkFrame(self.EnterTab.tab("COM"), fg_color=TabColor)
+        appearance_frame.pack(padx=20, pady=(0, 10), fill="x")
 
-        self.appearance_mode_menu = customtkinter.CTkOptionMenu(other_frame, values=["Light", "Dark", "System", "About"], command=self.change_appearance_mode_event)
-        self.appearance_mode_menu.pack(side="left")
+        self.appearance_mode_menu = customtkinter.CTkOptionMenu(appearance_frame, values=["Light", "Dark", "System", "About"],width=100, command=self.change_appearance_mode_event)
+        self.appearance_mode_menu.pack(side="left", padx=(0,5))
+
+        update_button = customtkinter.CTkButton(appearance_frame, text="", command=self.open_update_html, 
+                                               image=self.update_img, compound="left", font=("Roboto", 15),
+                                               width=30, height=30, fg_color="transparent")#, hover_color=("#E0F2F8","#AED6F1"))
+        update_button.pack(side="left")
 
         self.logo = customtkinter.CTkImage(light_image=Image.open(os.path.join(os.path.dirname(__file__), "logo.png")), size=(60, 40))
         info_label = customtkinter.CTkLabel(self.EnterTab.tab("COM"), text="仅授权小米内部使用...", font=("Roboto", 16), text_color="red",image=self.logo, compound="left")
@@ -347,7 +360,7 @@ class UwbReaderAssistant:
     def connect_enter(self): 
         try:
             if self.port_var.get():
-                self.EnterSerial = serial.Serial(self.port_var.get(), self.baudrate_var.get(), timeout=0.1)
+                self.EnterSerial = serial.Serial(self.port_var.get(), self.baudrate_var.get(), timeout=0.05)
                 self.enter_running = True
                 self.read_thread_enter = threading.Thread(target=self.read_data_enter)
                 self.read_thread_enter.start()
@@ -358,7 +371,7 @@ class UwbReaderAssistant:
     def connect_exit(self):
         try:
             if self.port_var1.get():
-                self.ExitSerial = serial.Serial(self.port_var1.get(), self.baudrate_var1.get(), timeout=0.1)
+                self.ExitSerial = serial.Serial(self.port_var1.get(), self.baudrate_var1.get(), timeout=0.05)
                 self.exit_running = True
                 self.read_thread_exit = threading.Thread(target=self.read_data_exit)
                 self.read_thread_exit.start()
@@ -427,39 +440,82 @@ class UwbReaderAssistant:
         data_upper = data.upper()
         sequence_upper = sequence.upper()
         index = data_upper.find(sequence_upper)
+        r_index = index 
         if index == -1:
             return
         DATA_POSITIONS = {
-            'COMMAND': (index + 26, index + 28),
-            'STATUS': (index + 28, index + 30),
-            'CARD_NO': (index + 122, index + 142),
-            'BALANCE': (index + 34, index + 42),
+            'COMMAND'   : (index + 26, index + 28),
+            'STATUS'    : (index + 28, index + 30),
+            'BALANCE'   : (index + 34, index + 42),
             'ONLINE_SEQ': (index + 42, index + 46),
-            'RANDOM_NO': (index + 56, index + 64)
+            'RANDOM_NO' : (index + 56, index + 64),
+            'R_APDU_NUM': (index + 54, index + 56),   #TODO 用于后续判断每个apdu是否都是9000
+            'W_APDU_NUM': (index + 30, index + 32),
+            'CARD_NO'   : (index + 122, index + 142),
+            'E1'        : (index + 484, index + 486),
+            'APPLET_RES': (index + 170, index + 174),
         }
         
         command = data_upper[DATA_POSITIONS['COMMAND'][0]:DATA_POSITIONS['COMMAND'][1]]
         status = data_upper[DATA_POSITIONS['STATUS'][0]:DATA_POSITIONS['STATUS'][1]]
+        print(f"data = {data}")
+        print(f'status = {status}')
         
         send_data = self.send_enter_data if is_enter else self.send_exit_data
         station_type = 0 if is_enter else 1
+
         if command == 'C9' and status == '00':    # send 8050,80dc
+            r_apdu_num = int(data_upper[DATA_POSITIONS['R_APDU_NUM'][0]:DATA_POSITIONS['R_APDU_NUM'][1]],16)
+            #TODO We may check all APDU response maybe in the future.
+
+            # Applet response checking
+            applet_res = data_upper[DATA_POSITIONS['APPLET_RES'][0]:DATA_POSITIONS['APPLET_RES'][1]]
+            print(f'applet res = {applet_res}')
+            if applet_res != '9000':
+                self.show_in_text_area("Card info is in error.") if is_enter else self.show_in_text_area1("Card info is in error.")
+                return 
+
+            # E1 file checking
+            e1 = data_upper[DATA_POSITIONS['E1'][0]:DATA_POSITIONS['E1'][1]]
+            print(f"E1 = {e1}")
+            # 根据E1检查开关状态决定是否执行E1检查
+            if self.e1_check_var.get() == "on":
+                if is_enter and e1 not in ['04', '00']:
+                    self.show_in_text_area("请勿重复进站")
+                    return
+                elif not is_enter and e1 not in ['03']:
+                    self.show_in_text_area1("进出站逻辑顺序错误")
+                    return
+
+            # SZT card checking
             self.CardNo = data_upper[DATA_POSITIONS['CARD_NO'][0]:DATA_POSITIONS['CARD_NO'][1]]
+            print(f'CardNo = {self.CardNo}')
+            if not self.CardNo.startswith("0310487"):
+                message = "卡号格式错误,非SZT卡片"
+                self.show_in_text_area(message) if is_enter else self.show_in_text_area1(message)
+                return
+
             if self.update_read_data_res(station_type) != 0:
                 send_data(self.enter_read_data_res if is_enter else self.exit_read_data_res, 1)
-                print(f"send {'enter' if is_enter else 'exit'} read data")
+                # print(f"send {'enter' if is_enter else 'exit'} read data")
                 self.flag = 1
+
         elif command == 'C3' and status == '00' and self.flag == 1:   #send 8054
+            w_apdu_num = int(data_upper[DATA_POSITIONS['W_APDU_NUM'][0]:DATA_POSITIONS['W_APDU_NUM'][1]],16)
+            # print(f"w_apdu_num: {w_apdu_num}")
             self.balance = data_upper[DATA_POSITIONS['BALANCE'][0]:DATA_POSITIONS['BALANCE'][1]]
             self.OnlineSeqNo = data_upper[DATA_POSITIONS['ONLINE_SEQ'][0]:DATA_POSITIONS['ONLINE_SEQ'][1]]
             self.RandomNo = data_upper[DATA_POSITIONS['RANDOM_NO'][0]:DATA_POSITIONS['RANDOM_NO'][1]]
             self.update_write_data_res()
             if self.get_mac(self.enter_write_data_res if is_enter else self.exit_write_data_res, station_type):
                 send_data(self.enter_write_data_res if is_enter else self.exit_write_data_res, 2)
-                print(f"send {'enter' if is_enter else 'exit'} write data")
+                # print(f"send {'enter' if is_enter else 'exit'} write data")
                 self.flag += 1
+
         elif command == 'C3' and status == '00' and self.flag == 2:   #send halt
-            print(f"send {'enter' if is_enter else 'exit'} halt data")
+            w_apdu_num = int(data_upper[DATA_POSITIONS['W_APDU_NUM'][0]:DATA_POSITIONS['W_APDU_NUM'][1]],16)
+            # print(f"w_apdu_num: {w_apdu_num}")
+            # print(f"send {'enter' if is_enter else 'exit'} halt data")
             send_data(self.halt_data_res, 3)
             self.flag = 0
 
@@ -532,7 +588,7 @@ class UwbReaderAssistant:
                         spendmsg = str(self.enter_id) + " | " + datetime.now().strftime("%H:%M:%S") + " | " + "$" + str(int(self.money_entry.get(),16)/100) + " | " + "OK"
                     self.show_in_text_area(spendmsg)
                     self.enter_id += 1
-                    print("-------------------------------ENTER OK -------------------------------")
+                    print("--------------------------------------ENTER OK --------------------------------------\n")
         except ValueError as e:
             messagebox.showerror("Send data error:", e)     
     
@@ -553,7 +609,7 @@ class UwbReaderAssistant:
                         spendmsg = str(self.exit_id) + " | " + datetime.now().strftime("%H:%M:%S") + " | " + "￥" + str(int(self.money_exit.get(),16)/100) + " | " + "OK"
                     self.show_in_text_area1(spendmsg)
                     self.exit_id += 1
-                    print("-------------------------------EXIT OK -------------------------------")
+                    print("--------------------------------------EXIT OK --------------------------------------\n")
         except ValueError as e:
             messagebox.showerror("Send data error:", e)
 
@@ -566,31 +622,62 @@ class UwbReaderAssistant:
         self.text_area1.see(tk.END)
     
     def get_available_ports(self):
-        ports = serial.tools.list_ports.comports()
-        self.old_port_options = self.port_options
-        self.port_options = [port.device for port in ports]
-
+        """使用注册表方式获取所有串口，包括虚拟串口"""
+        try:
+            import winreg
+            self.old_port_options = self.port_options.copy() if hasattr(self, 'port_options') else []
+            self.port_options = []
+            
+            # 从注册表获取串口信息
+            path = 'HARDWARE\\DEVICEMAP\\SERIALCOMM'
+            key = winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, path)
+            
+            for i in range(256):
+                try:
+                    val = winreg.EnumValue(key, i)
+                    # val[1]是串口名称，如COM1
+                    self.port_options.append(val[1])
+                except:
+                    break
+            
+            winreg.CloseKey(key)
+            
+            # 如果注册表方式没有找到串口，尝试使用pyserial方式
+            if not self.port_options:
+                ports = serial.tools.list_ports.comports()
+                self.port_options = [port.device for port in ports]
+                
+        except Exception as e:
+            # messagebox.showerror("获取串口列表错误:", str(e))
+            # 出错时尝试使用pyserial方式
+            try:
+                ports = serial.tools.list_ports.comports()
+                self.port_options = [port.device for port in ports]
+            except:
+                self.port_options = []
+    
     def update_ports_periodically(self):
         current_enter_selection = self.port_var.get()
         current_exit_selection = self.port_var1.get()
+        
         self.get_available_ports()
-        if self.old_port_options != self.port_options:
+        
+        if set(self.old_port_options) != set(self.port_options):
+            # 更新下拉菜单选项
             self.port_menu.configure(values=self.port_options)
             self.port_menu1.configure(values=self.port_options)
-
-        if current_enter_selection in self.port_options:
-            self.port_var.set(current_enter_selection)
-        elif self.port_options:
-            # 如果当前选择的串口不可用，选择第一个可用的串口
-            self.port_var.set(self.port_options[0])
-        
-        if current_exit_selection in self.port_options:
-            self.port_var1.set(current_exit_selection)
-        elif self.port_options:
-            # 如果当前选择的串口不可用，选择第一个可用的串口
-            self.port_var1.set(self.port_options[0])
-
-        self.master.after(3000, self.update_ports_periodically)  #TODO：连接串口时拔掉串口会导致程序卡死
+            
+            # 处理当前选择的串口
+            if current_enter_selection and current_enter_selection in self.port_options:
+                self.port_var.set(current_enter_selection)
+            elif self.port_options:
+                self.port_var.set(self.port_options[0])
+            
+            if current_exit_selection and current_exit_selection in self.port_options:
+                self.port_var1.set(current_exit_selection)
+            elif self.port_options:
+                self.port_var1.set(self.port_options[0])
+        self.master.after(2000, self.update_ports_periodically)  # 每2秒更新一次
 
     def toggle_topmost(self):
         if self.switch_var.get() == "on":
@@ -610,6 +697,7 @@ class UwbReaderAssistant:
         image_path = os.path.dirname(__file__) + "\\PIC"
         self.delete_img = customtkinter.CTkImage(Image.open(os.path.join(image_path, "Delete.png")), size=(20, 20))
         self.info_img = customtkinter.CTkImage(Image.open(os.path.join(image_path, "info.png")), size=(20, 20))
+        self.update_img = customtkinter.CTkImage(Image.open(os.path.join(image_path, "info.png")), size=(20, 20))
         # self.car_img = customtkinter.CTkImage(Image.open(os.path.join(image_path, "car.mp4")), size=(20, 20))
 
     def show_about(self):
@@ -621,6 +709,15 @@ class UwbReaderAssistant:
         Email: Tommy.yang@cardshare.cn
         """
         messagebox.showinfo("关于", about_message)
+    
+    def open_update_html(self):
+        """打开更新日志HTML文件"""
+        html_path = os.path.join(os.path.dirname(__file__), "update.html")
+        if os.path.exists(html_path):
+            import webbrowser
+            webbrowser.open(html_path)
+        else:
+            messagebox.showerror("错误", "找不到更新日志文件")
 
     def change_theme(self, theme ):
         if theme in ("light", "dark", "System"):

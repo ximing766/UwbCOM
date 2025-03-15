@@ -11,7 +11,7 @@ def format_numbers(numbers):
     return result
 
 # 示例输入
-input = "350080DC00F0300300000002790011020400000000000015000000000000224A20250114142937584012215840FFFFFFFF000000000000"
+input = "00A4040010A0000006320101050113581058000000"
 
 formatted_result = format_numbers(input)
 print(f'{formatted_result},')
