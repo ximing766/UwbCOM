@@ -37,7 +37,7 @@ class UwbReaderAssistant:
         self.ExitSerial = None
         self.enter_running = False
         self.exit_running = False
-        self.timeout_threshold = 0.1
+        self.timeout_threshold = 0.1     #XXX 现在的写卡时间为6-700ms
         self.enter_id = 1
         self.exit_id = 1
         self.flag = 0
@@ -178,7 +178,7 @@ class UwbReaderAssistant:
         self.text_area1 = customtkinter.CTkTextbox(ExitTabFrame, width=200, height=400,  fg_color=("#E6E6FF", "#A0C8CF"), text_color="black")  
         self.text_area1.grid(row=0, column=0,padx=1, pady=1, sticky='nsew')
         self.clear_button1 = customtkinter.CTkButton(ExitTabFrame, text="", command=self.clear_text_area1, font=("Roboto", 15), image=self.delete_img)
-        self.clear_button1.grid(row=1, column=0, padx=1, pady=1, sticky="ew")
+        self.clear_button1.grid(row=1, column=0, padx=1,pady=1, sticky="ew")
         
         ## Setting ##
         industry_frame = customtkinter.CTkFrame(self.EnterTab.tab("Setting"),fg_color= TabColor)

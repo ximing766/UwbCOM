@@ -39,7 +39,7 @@ class SerialAssistant:
     def __init__(self, master, log):
         self.master = master
         self.log = log
-        self.version = "V1.4.6.1"
+        self.version = "V1.4.6.3"
         self.view = "default"                                 # view没创建为单独的类，这里只能共用一个再去区分了
         self.master.title("UwbCOM " + self.version)
         self.master.minsize(850, 835)
@@ -108,11 +108,19 @@ class SerialAssistant:
         self.user_txt      = {}
         self.user_txt_aoa  = {}
 
+        self.test_gate_width = 118
+        self.test_gate_height = 74
+        self.base_points = [
+            (0, -40), (0, 0), (1, 10), (0, 10), (-1, 10),
+            (1, 60), (0, 60), (-1, 60), (1, 110), (0, 110),
+            (-1, 110), (1, 160), (0, 160), (-1, 160), (0, 210)
+        ]
+
         ## ** User Define ** ##
         #Emoji._ITEMS[i].name                               "🤨"
         # print(Emoji._ITEMS)
         self.face                 = Emoji.get("winking face")
-        self.table_columns        = ('ID','User','nLos','D-Master','D-Slaver','D-Gate','Speed','x','y','z','Auth','Trans')
+        self.table_columns        = ('ID','User','nLos','D-Master','D-Slaver','D-Gate','Speed','x','y','z','Auth','Trans','RSSI-M')
         self.log_feature          = ('Auth','Trans')
         self.PosInfo              = "@POSI"
         self.CardInfo             = "@CARD"
@@ -192,6 +200,34 @@ class SerialAssistant:
         if self.serial_open == True:
             self.insert_data(self.table_1s_data)
         self.master.after(1000, self.update_Table)
+    
+    def process_distance_data(self):
+        if not self.table_data:
+            return 0, 0, 0, 0, 0
+        data = np.array(self.table_data)
+        M_dis = data[:, 3].astype(float)  # 第4列是Master距离
+        S_dis = data[:, 4].astype(float)  # 第5列是Slaver距离
+        M_RSSI = data[:, 12].astype(float)  # 第13列是Master的RSSI
+        return np.average(M_dis), np.std(M_dis), M_RSSI[-1], np.average(S_dis), np.std(S_dis)
+    
+    def update_Test(self):
+        if self.serial_open:
+            M_avg, M_std, M_RSSI, S_avg, S_std = self.process_distance_data()
+            point_type = 'A' if self.Height_entry.get() == '0.8' else 'B'
+            point_index = self.Point_entry.get()
+            M_cacl = self.point_distances[point_type][point_index]['D_M']  #TODO 修改内容时，这儿读到空
+            S_cacl = self.point_distances[point_type][point_index]['D_M']
+
+            self.m_avg_var.set(f"{M_avg:.1f}")
+            self.m_std_var.set(f"{M_std:.1f}")
+            self.m_res_var.set(f"{M_cacl - M_avg:.1f}")
+            self.m_res_progress['value'] = min(abs(M_cacl - M_avg), 100)
+            self.m_rssi_var.set(f"{M_RSSI:.1f}")
+            self.s_avg_var.set(f"{S_avg:.1f}")
+            self.s_std_var.set(f"{S_std:.1f}")
+            self.s_res_var.set(f"{S_cacl - S_avg:.1f}")
+            self.s_res_progress['value'] = min(abs(S_cacl - S_avg), 100)
+        self.master.after(1000, self.update_Test)
 
     def update_canvas(self):
         if self.serial_open == True:
@@ -202,76 +238,66 @@ class SerialAssistant:
     def create_widgets(self, view = None):
         '''
         description: 串口设置区域
-        
-        '''        
+        '''
         frame_settings = ttk.LabelFrame(self.master, text=f'{Emoji._ITEMS[145]} + {Emoji._ITEMS[146]} + {Emoji._ITEMS[1258]}',bootstyle="info")
         frame_settings.grid(row=0, column=0, padx=5, pady=5,sticky='nsew')
-        frame_settings.grid_columnconfigure(0, weight=1)
-        frame_settings.grid_columnconfigure(1, weight=1)
-        frame_settings.grid_columnconfigure(2, weight=1)
-        frame_settings.grid_columnconfigure(3, weight=1)
-        frame_settings.grid_columnconfigure(4, weight=1)
-        frame_settings.grid_columnconfigure(5, weight=1)
-        frame_settings.grid_columnconfigure(6, weight=1)
-        frame_settings.grid_columnconfigure(7, weight=1)
+        frame_settings.grid_columnconfigure(4, weight=1)  # 右侧框架占比
         frame_settings.grid_rowconfigure(0, weight=1)
-        frame_settings.grid_rowconfigure(1, weight=1)
 
-        ttk.Label(frame_settings, text="COM", font=("Arial", 12), bootstyle="info").grid(row=0, column=0, padx=5, pady=5,sticky='nsew')
-
-        self.combo = ttk.Combobox(frame_settings, values=self.get_serial_ports(),bootstyle="info")
+        # COM端口选择
+        ttk.Label(frame_settings, text="COM", font=("Arial", 10), bootstyle="info").grid(row=0, column=0, padx=2, pady=2, sticky='nsew')
+        self.combo = ttk.Combobox(frame_settings, values=self.get_serial_ports(), bootstyle="info", width=10)
         self.update_combobox()
-        self.combo.grid(row=0, column=1, padx=5, pady=5,sticky='nsew')
+        self.combo.grid(row=0, column=1, padx=2, pady=2, sticky='nsew')
 
-        ttk.Label(frame_settings, text="Baud", font=("Arial", 12), bootstyle="info").grid(row=1, column=0, padx=5, pady=5,sticky='nsew')
-        
-        self.baudCombo = ttk.Combobox(frame_settings,values=['3000000','115200','9600'],bootstyle="info")
+        # 波特率选择
+        ttk.Label(frame_settings, text="Baud", font=("Arial", 10), bootstyle="info").grid(row=1, column=0, padx=2, pady=2, sticky='nsew')
+        self.baudCombo = ttk.Combobox(frame_settings, values=['3000000','115200','9600'], bootstyle="info", width=10)
         self.baudCombo.current(0)
-        self.baudCombo.grid(row=1, column=1, padx=5, pady=5,sticky='nsew')
+        self.baudCombo.grid(row=1, column=1, padx=2, pady=2, sticky='nsew')
 
-        button_width = 8
-        entry_width  = 20
+        # 串口开关按钮
+        self.serial_bt = ttk.Button(frame_settings, text="打开串口", command=self.open_serial, bootstyle="info", width=8)
+        self.serial_bt.grid(row=0, column=2, padx=2, pady=2, sticky='nsew')
 
-        self.serial_bt = ttk.Button(frame_settings, text="打开串口", command=self.open_serial, width=button_width,bootstyle="info")
-        self.serial_bt.grid(row=0, column=2, padx=5, pady=5,sticky='nsew')
-
+        # 模式选择
         if view == "default":
-            self.modeCombo = ttk.Combobox(frame_settings,values=['GATE','LIFT','UL-TDOA','DL-TDOA'],width=button_width,bootstyle="info")
+            self.modeCombo = ttk.Combobox(frame_settings, values=['GATE','LIFT','UL-TDOA','DL-TDOA'], bootstyle="info", width=10)
         else:
-            self.modeCombo = ttk.Combobox(frame_settings,values=['GATE'],width=button_width,bootstyle="info")
+            self.modeCombo = ttk.Combobox(frame_settings, values=['GATE'], bootstyle="info", width=10)
         self.modeCombo.current(0)
-        self.modeCombo.grid(row=1, column=2, padx=5, pady=5,sticky='nsew')
+        self.modeCombo.grid(row=1, column=2, padx=2, pady=2, sticky='nsew')
         self.modeCombo.bind("<<ComboboxSelected>>", self.on_mode_change)
 
-        card_Button     = ttk.Button(frame_settings, text="卡  号", command=lambda:self.send_data(11111), width=button_width,bootstyle="primary").grid(row=0, column=4, padx=5, pady=5,sticky='nsew')   #这块数据下行
-        self.text_area1 = ttk.Entry(frame_settings,width=entry_width,bootstyle="info")
-        self.text_area1.grid(row=0, column=3, padx=5, pady=5, sticky='nsew')
-        
-        other_Button    = ttk.Button(frame_settings, text="有效期", command=self.toggle_call_status, width=button_width,bootstyle="primary")
-        other_Button.grid(row=1, column=4, padx=5, pady=5,sticky='nsew')
-        self.text_area2 = ttk.Entry(frame_settings,width=entry_width,bootstyle="info")
-        self.text_area2.grid(row=1, column=3, padx=5, pady=5, sticky='nsew') 
-        
-        other_Button1   = ttk.Button(frame_settings, text="余  额", command=lambda:self.send_data(33333), width=button_width,bootstyle="primary").grid(row=0, column=6, padx=5, pady=5,sticky='nsew')
-        self.text_area3 = ttk.Entry(frame_settings,width=entry_width,bootstyle="info")
-        self.text_area3.grid(row=0, column=5, padx=5, pady=5, sticky='nsew') 
-        
-        other_Button2   = ttk.Button(frame_settings, text="交易记录", command=lambda:self.send_data(44444), width=button_width,bootstyle="primary").grid(row=1, column=6, padx=5, pady=5,sticky='nsew')
-        self.text_area4 = ttk.Entry(frame_settings,width=entry_width,bootstyle="info")
-        self.text_area4.grid(row=1, column=5, padx=5, pady=5, sticky='nsew')
-        
-        if view != "default":        
-            image_path = self.resource_path('logo.png')
-            self.image = Image.open(image_path)
-            self.image.thumbnail((100, 30))
-            self.photo = ImageTk.PhotoImage(self.image)
-            self.label = ttk.Label(frame_settings, image=self.photo)
-            self.label.grid(row=0, column=7, columnspan=2,rowspan=1, padx=5, pady=5,sticky='nsew')
-            self.label.image = self.photo
-            txt_label = "仅授权小米内部使用" if view == 'xiaomi' else "xxxxxx"
-            self.txt_label = ttk.Label(frame_settings, text=txt_label,font=("Arial", 8),bootstyle="dark")
-            self.txt_label.grid(row=1, column=7, columnspan=2,rowspan=1, padx=5, pady=5,sticky='nsew')
+        # 卡片信息容器（新增带边框的Frame）
+        card_info_frame = ttk.Frame(frame_settings)
+        card_info_frame.grid(row=0, column=4, rowspan=2, padx=10, sticky='nsew')
+        card_info_frame.grid_rowconfigure(0, weight=1)
+        card_info_frame.grid_rowconfigure(1, weight=1)
 
+        # 卡号信息（使用更醒目的字体和颜色）
+        ttk.Label(card_info_frame, text="卡号: ", font=("Arial", 12), bootstyle="info").grid(row=0, column=0, sticky='w')
+        self.cardNo_txt = ttk.Entry(card_info_frame, font=("Consolas", 10, "bold"), bootstyle="info", width=20)
+        self.cardNo_txt.insert(0, "-- -- -- --")
+        self.cardNo_txt.grid(row=0, column=1, pady=2, sticky='ew')
+
+        # 余额信息（添加货币符号和颜色强调）
+        ttk.Label(card_info_frame, text="余额: ", font=("Arial", 12), bootstyle="info").grid(row=1, column=0, sticky='w')
+        self.balance_txt = ttk.Entry(card_info_frame, font=("Consolas", 10, "bold"), bootstyle="success", width=20)
+        self.balance_txt.insert(0, "￥0.00")
+        self.balance_txt.grid(row=1, column=1, pady=2, sticky='ew')
+
+        # Logo显示（调整到最右侧并增加间距）
+        image_path = self.resource_path('logo.png')
+        self.image = Image.open(image_path)
+        self.image.thumbnail((100, 45))
+        self.photo = ImageTk.PhotoImage(self.image)
+        self.label = ttk.Label(frame_settings, image=self.photo)
+        self.label.grid(row=0, column=6, rowspan=2, padx=20, sticky='e')
+        self.label.image = self.photo
+
+        # 配置列权重确保布局稳定
+        # frame_settings.columnconfigure(6, weight=1)
         
         '''
         description: 通信区域
@@ -313,35 +339,29 @@ class SerialAssistant:
         frame_comm_R_Top.grid_columnconfigure(0, weight=1)
         for i in range(8):  # 为8个按钮配置行权重
             frame_comm_R_Top.grid_rowconfigure(i, weight=1)
+        # 定义按钮配置列表
+        button_configs = [
+            {"text": "Clear", "command": lambda: self.on_ClearWindow(), "state": "normal"},
+            {"text": "Distance", "command": lambda: self.on_checkbutton_click_distance(), "state": "normal"},
+            {"text": "Speed", "command": lambda: self.on_checkbutton_click_speed(), "state": "normal"},
+            {"text": "X-Y-Z", "command": lambda: self.on_checkbutton_click_xyz(), "state": "normal"},
+            {"text": "Reserved1", "command": None, "state": "disabled"},
+            {"text": "Reserved2", "command": None, "state": "disabled"},
+            {"text": "Reserved3", "command": None, "state": "disabled"},
+            {"text": "Reserved4", "command": None, "state": "disabled"}
+        ]
         
-        # # 设置frame的propagate为False，防止自动调整大小
-        # frame_comm_R_Top.grid_propagate(False)
-
-        clear_bt = ttk.Button(frame_comm_R_Top, text="清除", command=lambda:self.on_ClearWindow(),bootstyle="success-outline")
-        clear_bt.grid(row=0, column=0, padx=1, pady=1,sticky='ew')
-
-        Check_bt1 = ttk.Button(frame_comm_R_Top, text="Distance", command=lambda:self.on_checkbutton_click_distance(), bootstyle="success-outline")
-        Check_bt1.grid(row=1, column=0, padx=1, pady=1,sticky='ew')
-
-        Check_bt2 = ttk.Button(frame_comm_R_Top, text="Speed", command=lambda:self.on_checkbutton_click_speed(), bootstyle="success-outline")
-        Check_bt2.grid(row=2, column=0, padx=1, pady=1,sticky='ew')
-
-        Check_bt3 = ttk.Button(frame_comm_R_Top, text="X-Y-Z", command=lambda:self.on_checkbutton_click_xyz(), bootstyle="success-outline")
-        Check_bt3.grid(row=3, column=0, padx=1, pady=1,sticky='ew')
-
-        Check_bt4 = ttk.Button(frame_comm_R_Top, text="Reserved1", state="disabled", bootstyle="success-outline")
-        Check_bt4.grid(row=4, column=0, padx=1, pady=1,sticky='ew')
-
-        Check_bt5 = ttk.Button(frame_comm_R_Top, text="Reserved2", state="disabled", bootstyle="success-outline")
-        Check_bt5.grid(row=5, column=0, padx=1, pady=1,sticky='ew')
-
-        Check_bt6 = ttk.Button(frame_comm_R_Top, text="Reserved3", state="disabled", bootstyle="success-outline")
-        Check_bt6.grid(row=6, column=0, padx=1, pady=1,sticky='ew')
-
-        Check_bt7 = ttk.Button(frame_comm_R_Top, text="Reserved4", state="disabled", bootstyle="success-outline")
-        Check_bt7.grid(row=7, column=0, padx=1, pady=1,sticky='ew')
-
-
+        # 通过循环创建按钮
+        for i, config in enumerate(button_configs):
+            btn = ttk.Button(
+                frame_comm_R_Top,
+                text=config["text"],
+                command=config["command"],
+                state=config["state"],
+                bootstyle="success-outline",
+                cursor="hand2",
+            )
+            btn.grid(row=i, column=0, padx=1, pady=1, sticky='ew')
 
         # 子总框下侧功能框(更具进度条的值，更新演示图中电梯的高度和深度,半径)
         frame_comm_R_Bottom = ttk.LabelFrame(frame_comm_R, width=300, height=15,text="demonstration",bootstyle="info")
@@ -432,19 +452,159 @@ class SerialAssistant:
         self.notebook.add(self.canvas_frame, text = 'canvas')
         self.canvas_frame.grid_columnconfigure(0, weight=1)
 
-        # self.phone_frame = ttk.Frame(self.notebook)
-        # self.notebook.add(self.phone_frame, text = 'phone')
-        # self.phone_frame.grid_columnconfigure(0, weight=1)
-
         self.canvas = tk.Canvas(self.canvas_frame,bg="white",height=390)
         self.canvas.grid(row=0, column=0, padx=5, pady=5,sticky='nsew')
         self.master.grid_columnconfigure(0, weight=1)
+
+        self.Test_frame = ttk.Frame(self.notebook)
+        self.notebook.add(self.Test_frame, text='Test')
+        self.Test_frame.grid_columnconfigure(0, weight=1, uniform='group1')
+        self.Test_frame.grid_columnconfigure(1, weight=1, uniform='group1')
         
+        # Master信息框
+        master_frame = ttk.LabelFrame(self.Test_frame, text="Master Information", padding=10, bootstyle="info")
+        master_frame.grid(row=0, column=0, padx=10, pady=5, sticky='nsew')
+        
+        # Master数据显示
+        ttk.Label(master_frame, text="Average:", bootstyle="info").grid(row=0, column=0, padx=5, pady=2, sticky='e')
+        self.m_avg_var = tk.StringVar(value="0.0")
+        ttk.Label(master_frame, textvariable=self.m_avg_var, width=10, bootstyle="inverse-info").grid(row=0, column=1, padx=5, pady=2, sticky='w')
+        
+        ttk.Label(master_frame, text="Std:", bootstyle="info").grid(row=1, column=0, padx=5, pady=2, sticky='e')
+        self.m_std_var = tk.StringVar(value="0.0")
+        ttk.Label(master_frame, textvariable=self.m_std_var, width=10, bootstyle="inverse-info").grid(row=1, column=1, padx=5, pady=2, sticky='w')
+        
+        ttk.Label(master_frame, text="Res:", bootstyle="info").grid(row=2, column=0, padx=5, pady=2, sticky='e')
+        self.m_res_var = tk.StringVar(value="0.0")
+        ttk.Label(master_frame, textvariable=self.m_res_var, width=10, bootstyle="inverse-info").grid(row=2, column=1, padx=5, pady=2, sticky='w')
+        self.m_res_progress = ttk.Progressbar(master_frame, length=100, maximum=100, mode='determinate', bootstyle="info")
+        self.m_res_progress.grid(row=2, column=2, columnspan=4, padx=5, pady=2, sticky='ew')
+        
+        ttk.Label(master_frame, text="RSSI:", bootstyle="info").grid(row=3, column=0, padx=5, pady=2, sticky='e')
+        self.m_rssi_var = tk.StringVar(value="0.0")
+        ttk.Label(master_frame, textvariable=self.m_rssi_var, width=10, bootstyle="inverse-info").grid(row=3, column=1, padx=5, pady=2, sticky='w')
+        
+        ttk.Label(master_frame, text="L:", bootstyle="info").grid(row=3, column=2, padx=5, pady=2, sticky='e')
+        self.Anchor_len = ttk.Entry(master_frame, width=5, bootstyle="info")
+        self.Anchor_len.grid(row=3, column=3, padx=5, pady=2, sticky='w')
+        self.Anchor_len.insert(0, "100")
+        
+        ttk.Label(master_frame, text="H:", bootstyle="info").grid(row=3, column=4, padx=5, pady=2, sticky='e')
+        self.Anchor_H = ttk.Entry(master_frame, width=5, bootstyle="info")
+        self.Anchor_H.grid(row=3, column=5, padx=5, pady=2, sticky='w')
+        self.Anchor_H.insert(0, "90")
+
+        self.update_anchor_btn = ttk.Button(master_frame, text="Update", command=self.update_test_points, width=8, bootstyle="info")
+        self.update_anchor_btn.grid(row=3, column=6, padx=5, pady=2, sticky='w')
+
+        # Slaver信息框
+        slaver_frame = ttk.LabelFrame(self.Test_frame, text="Slaver Information", padding=10, bootstyle="success")
+        slaver_frame.grid(row=0, column=1, padx=10, pady=5, sticky='nsew')
+        
+        # Slaver数据显示
+        ttk.Label(slaver_frame, text="Average:", bootstyle="success").grid(row=0, column=0, padx=5, pady=2, sticky='e')
+        self.s_avg_var = tk.StringVar(value="0.0")
+        ttk.Label(slaver_frame, textvariable=self.s_avg_var, width=10, bootstyle="inverse-success").grid(row=0, column=1, padx=5, pady=2, sticky='w')
+        
+        ttk.Label(slaver_frame, text="Std:", bootstyle="success").grid(row=1, column=0, padx=5, pady=2, sticky='e')
+        self.s_std_var = tk.StringVar(value="0.0")
+        ttk.Label(slaver_frame, textvariable=self.s_std_var, width=10, bootstyle="inverse-success").grid(row=1, column=1, padx=5, pady=2, sticky='w')
+        
+        ttk.Label(slaver_frame, text="Res:", bootstyle="success").grid(row=2, column=0, padx=5, pady=2, sticky='e')
+        self.s_res_var = tk.StringVar(value="0.0")
+        ttk.Label(slaver_frame, textvariable=self.s_res_var, width=10, bootstyle="inverse-success").grid(row=2, column=1, padx=5, pady=2, sticky='w')
+        self.s_res_progress = ttk.Progressbar(slaver_frame, length=100, maximum=100, mode='determinate', bootstyle="success")
+        self.s_res_progress.grid(row=2, column=2, columnspan=4, padx=5, pady=2, sticky='ew')
+
+        ttk.Label(slaver_frame, text="RSSI:", bootstyle="success").grid(row=3, column=0, padx=5, pady=2, sticky='e')
+        self.s_rssi_entry = ttk.Entry(slaver_frame, width=10, bootstyle="success")
+        self.s_rssi_entry.grid(row=3, column=1, padx=5, pady=2, sticky='w')
+        self.s_rssi_entry.insert(0, "0.0")
+
+        ttk.Label(slaver_frame, text="P:", bootstyle="success").grid(row=3, column=2, padx=5, pady=2, sticky='e')
+        self.Point_entry = ttk.Entry(slaver_frame, width=5, bootstyle="success")
+        self.Point_entry.grid(row=3, column=3, padx=5, pady=2, sticky='w')
+        self.Point_entry.insert(0, "0")
+        
+        ttk.Label(slaver_frame, text="H:", bootstyle="success").grid(row=3, column=4, padx=5, pady=2, sticky='e')
+        self.Height_entry = ttk.Entry(slaver_frame, width=5, bootstyle="success")
+        self.Height_entry.grid(row=3, column=5, padx=5, pady=2, sticky='w')
+        self.Height_entry.insert(0, "0.8")
+
+        log_frame = ttk.Frame(self.Test_frame)
+        log_frame.grid(row=1, column=0, columnspan=2, padx=10, pady=5, sticky='w')  # 修改sticky为'w'
+        log_frame.grid_columnconfigure(0, weight=0)  # 移除左侧空白权重
+        log_frame.grid_columnconfigure(4, weight=1)  # 保持右侧空白权重
+        
+        self.log_name_entry = ttk.Entry(log_frame, width=20, bootstyle="primary")
+        self.log_name_entry.grid(row=0, column=0, padx=5, pady=2)
+        ttk.Button(log_frame, text="Log", command=self.start_test_logging, bootstyle="primary", width=10).grid(row=0, column=1, padx=5, pady=2)
 
         '''
         others
         '''
+    def start_test_logging(self):
+        prefix = self.log_name_entry.get().strip()
+        if not prefix:
+            messagebox.showerror("错误", "请输入日志名称")
+            return
+    
+        # 如果当前没有test logger或者prefix不同，创建新的logger
+        if not hasattr(self, 'current_test_prefix') or self.current_test_prefix != prefix:
+            self.current_test_prefix = prefix
+            self.log.add_test_handler(prefix)
+            headers = ['Point', 'Height', 'M_Avg', 'M_Std', 'M_Res', 'M_RSSI', 'S_Avg', 'S_Std', 'S_Res', 'S_RSSI']
+            self.log.info_test(','.join(headers) + '\n')
+        
+        current_data = [
+            self.Point_entry.get(),
+            self.Height_entry.get(),
+            self.m_avg_var.get(),
+            self.m_std_var.get(),
+            self.m_res_var.get(),
+            self.m_rssi_var.get(),
+            self.s_avg_var.get(),
+            self.s_std_var.get(),
+            self.s_res_var.get(),
+            self.s_rssi_entry.get()
+        ]
+        
+        self.log.info_test(','.join(current_data) + '\n')
+        messagebox.showinfo("成功", f"数据已记录到日志: {prefix}")
 
+    # 获取所有测试点到M，S的欧氏距离
+    def update_test_points(self):
+        self.test_gate_width = int(self.Anchor_len.get())
+        self.test_gate_height = int(self.Anchor_H.get())
+        self.MAnchor = [self.test_gate_width/2, 0, self.test_gate_height]
+        self.SAnchor = [-self.test_gate_width/2, 0, self.test_gate_height]
+        self.test_point = {
+            **{f"A{i}": [x * (self.test_gate_width/2 if x != 0 else 1), y, 80] 
+                for i, (x, y) in enumerate(self.base_points)},
+            **{f"B{i}": [x * (self.test_gate_width/2 if x != 0 else 1), y, 150] 
+                for i, (x, y) in enumerate(self.base_points)}
+        }
+        self.point_distances = {
+            'A': {},  # A类测试点的距离
+            'B': {}   # B类测试点的距离
+        }
+        for point_name, coords in self.test_point.items():
+            m_dist = math.sqrt((coords[0] - self.MAnchor[0])**2 + 
+                                (coords[1] - self.MAnchor[1])**2 + 
+                                (coords[2] - self.MAnchor[2])**2)
+            s_dist = math.sqrt((coords[0] - self.SAnchor[0])**2 + 
+                                (coords[1] - self.SAnchor[1])**2 + 
+                                (coords[2] - self.SAnchor[2])**2)
+            
+            # 根据点名前缀(A或B)存储距离
+            point_type = point_name[0]  # 获取A或B
+            point_index = point_name[1:]  # 获取数字部分
+            self.point_distances[point_type][point_index] = {
+                'D_M': round(m_dist),
+                'D_S': round(s_dist)
+            }
+        print(self.point_distances)
+        
     def resource_path(self, relative_path):
         if hasattr(sys, '_MEIPASS'):
             return os.path.join(sys._MEIPASS, relative_path)
@@ -454,6 +614,7 @@ class SerialAssistant:
         children = self.Table.get_children()
         if children:
             self.Table.yview_moveto(1.0)
+
     def insert_data(self, data):
         if data == []:
             return
@@ -468,18 +629,20 @@ class SerialAssistant:
         self.table_1s_data = []
     
     def SetTableColumns(self):
-        self.Table.column('ID',width=50, anchor='w')
-        self.Table.column('User',width=35, anchor='w')
-        self.Table.column('nLos',width=50, anchor='w')
-        self.Table.column('D-Master',width=65, anchor='w')
-        self.Table.column('D-Slaver',width=65, anchor='w')
-        self.Table.column('D-Gate',width=65, anchor='w')
-        self.Table.column('Speed',width=50, anchor='w')
-        self.Table.column('x',width=50, anchor='w')
-        self.Table.column('y',width=50, anchor='w')
-        self.Table.column('z',width=50, anchor='w')
-        self.Table.column('Auth',width=50, anchor='w')
-        self.Table.column('Trans',width=50, anchor='w')
+        self.Table.column('ID',       width=45, anchor='w')
+        self.Table.column('User',     width=30, anchor='w')
+        self.Table.column('nLos',     width=30, anchor='w')
+        self.Table.column('D-Master', width=45, anchor='w')
+        self.Table.column('D-Slaver', width=45, anchor='w')
+        self.Table.column('D-Gate',   width=45, anchor='w')
+        self.Table.column('Speed',    width=35, anchor='w')
+        self.Table.column('x',        width=35, anchor='w')
+        self.Table.column('y',        width=35, anchor='w')
+        self.Table.column('z',        width=35, anchor='w')
+        self.Table.column('Auth',     width=35, anchor='w')
+        self.Table.column('Trans',    width=35, anchor='w')
+        self.Table.column('RSSI-M',   width=40, anchor='w')
+        # self.Table.column('RSSI-S',   width=40, anchor='w')
         
 
     def update_serial_button(self):
@@ -497,9 +660,8 @@ class SerialAssistant:
 
     def on_ClearWindow(self):
         self.clear_table()
-        self.text_area1.delete(0,tk.END)
-        self.text_area2.delete(0,tk.END)
-        self.text_area3.delete(0,tk.END)
+        self.cardNo_txt.delete(0,tk.END)
+        self.balance_txt.delete(0,tk.END)
         self.text_area4.delete(0,tk.END)  
     
     def on_checkbutton_click_distance(self):
@@ -520,18 +682,16 @@ class SerialAssistant:
         self.flag_str = str(flag)
         self.serial.write(self.flag_str.encode())
         
-    def show_cardData(self,data):    
+    def show_cardData(self, data):    
         data = data.strip()
         try:
             json_data = json.loads(data)
             cardNumber = json_data['CardNumber']
-            self.text_area1.delete(0, tk.END)
-            self.text_area1.insert(tk.END, cardNumber)    
-            balance = json_data['Balance']
-            self.text_area3.delete(0, tk.END)
-            self.text_area3.insert(tk.END, str(balance / 100) + '￥') 
+            self.cardNo_txt.configure(text=cardNumber)
+            balance = json_data['Balance'] / 100
+            self.balance_txt.configure(text=f"{balance:.2f}￥")
         except json.JSONDecodeError as e:
-            messagebox.showerror("JSON decode error:", e)       
+            messagebox.showerror("JSON decode error:", e)   
         
     def change_filter(self,flag):
         self.Use_KF = flag
@@ -551,9 +711,11 @@ class SerialAssistant:
             self.serial_open = True
             self.update_canvas()
             self.update_Table()
+            self.update_Test()
             self.update_serial_button()
             self.log.add_filehandler()
             self.log.info(', '.join(self.table_columns)) # 写入Log表头
+            self.log.add_second_handler()
             self.log_number = 0
 
         except Exception as e:
@@ -590,7 +752,7 @@ class SerialAssistant:
             try:
                 if (data := self.serial.readline()):
                     data = data.decode('utf-8',errors='replace')
-                                                               
+                    self.log.info_second(data)
                     if self.pos_pattern.search(data):       
                         match = re.search(r'\{.*?\}', data, re.DOTALL)        
                         try:
@@ -643,7 +805,8 @@ class SerialAssistant:
                             data_x = int(self.x - 400)
 
                         self.table_one_data = (idx, self.distance_list[idx]['nLos'], self.distance_list[idx]['MasterDistance'], self.distance_list[idx]['SlaverDistance'], \
-                                           self.distance_list[idx]['GateDistance'], json_data['Speed'], data_x, int(self.y-60), int(self.z), json_data.get('Auth'), json_data.get('Trans'))
+                                               self.distance_list[idx]['GateDistance'], json_data['Speed'], data_x, int(self.y-60), int(self.z), json_data.get('Auth'),     \
+                                               json_data.get('Trans'), int(json_data.get('LiftDeep'))/2)
                         self.table_1s_data.append(self.table_one_data)  #  Table 秒级更新
                         log_data = (self.log_number,) + self.table_one_data  #+ (self.distance_list[idx]['Auth'] , self.distance_list[idx]['Trans'])
                         self.log.info(', '.join(map(str, log_data)))    #  log 实时更新
@@ -928,9 +1091,6 @@ class SerialAssistant:
 
     def draw_basic(self, idx):
         self.canvas.delete("all")
-        # self.canvas.create_oval(40, 40, 60, 60, fill='red', outline='red', width=2, tags = 'status_circle')  # 红色圆形
-        # self.canvas.create_text(50, 70, text="非打电话场景", font=("Microsoft YaHei", 10), 
-        #                       fill='red', anchor='n', tags = 'status_text')
         # AOA
         if self.Use_AOA == True:
             # 绘制闸机(left)  以400为x原点，右下角坐标:[400-self.Master2SlverDistance/2,60]  左上角坐标[(400-self.Master2SlverDistance/2-30),10]
@@ -1242,18 +1402,31 @@ def main():
 class Log:
     def __init__(self,name,level=logging.INFO):
         self.logger = logging.getLogger(name)
+        self.second_logger = logging.getLogger(name + "_second")
+        self.test_logger = logging.getLogger(name + "_Test")
         self.logger.setLevel(level)
+        self.second_logger.setLevel(level)
+        self.test_logger.setLevel(level)
         self.log_queue = queue.Queue()
+        self.second_log_queue = queue.Queue()
+        self.test_log_queue = queue.Queue()
+        
         self.thread = threading.Thread(target=self.log_handler)
         self.thread.daemon = True
         self.thread.start()
+        
+        self.second_thread = threading.Thread(target=self.second_log_handler)
+        self.second_thread.daemon = True
+        self.second_thread.start()
+
+        self.test_thread = threading.Thread(target=self.test_log_handler)
+        self.test_thread.daemon = True
+        self.test_thread.start()
 
         self.root_path = os.path.dirname(sys.executable)
         self.log_dir = os.path.join(self.root_path,'UwbCOMLog')
         if not os.path.exists(self.log_dir):
             os.makedirs(self.log_dir)
-
-        # self.add_filehandler()
 
     def add_filehandler(self):
         self.log_file_path = os.path.join(self.log_dir, f'UwbCOM_Log_{time.strftime("%Y-%m-%d-%H-%M-%S")}.csv')
@@ -1262,9 +1435,32 @@ class Log:
         self.file_handler.setFormatter(self.log_format)
         self.logger.addHandler(self.file_handler)
     
+    def add_second_handler(self):
+        self.second_log_file_path = os.path.join(self.log_dir, f'UwbCOM_Second_Log_{time.strftime("%Y-%m-%d-%H-%M-%S")}.log')
+        self.second_file_handler = logging.FileHandler(self.second_log_file_path,mode='a')
+        self.second_log_format = logging.Formatter('[%(asctime)s.%(msecs)03d] | %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
+        self.second_file_handler.terminator = ''
+        self.second_file_handler.setFormatter(self.second_log_format)
+        self.second_logger.addHandler(self.second_file_handler)
+    
+    def add_test_handler(self, prefix=''):
+        file_name = f'{prefix}_UwbCOM_Test_Log_{time.strftime("%Y-%m-%d-%H-%M-%S")}.csv' if prefix else f'UwbCOM_Test_Log_{time.strftime("%Y-%m-%d-%H-%M-%S")}.csv'
+        self.test_log_file_path = os.path.join(self.log_dir, file_name)
+        self.test_file_handler = logging.FileHandler(self.test_log_file_path, mode='a')
+        self.test_log_format = logging.Formatter('%(message)s', datefmt='%Y-%m-%d %H:%M:%S')
+        self.test_file_handler.terminator = ''
+        self.test_file_handler.setFormatter(self.test_log_format)
+        self.test_logger.addHandler(self.test_file_handler)
+    
     def remove_filehandler(self):
-        self.logger.removeHandler(self.file_handler)
-        self.file_handler.close()
+        # 修改现有的remove方法，添加test handler的清理
+        if hasattr(self, 'file_handler'):
+            self.logger.removeHandler(self.file_handler)
+            self.file_handler.close()
+        if hasattr(self, 'second_file_handler'):
+            self.second_logger.removeHandler(self.second_file_handler)
+            self.second_file_handler.close()
+        
     
     def log_handler(self):
         while True:
@@ -1283,6 +1479,41 @@ class Log:
                 
             except queue.Empty:
                 pass
+    
+    def second_log_handler(self):
+        while True:
+            try:
+                level, msg = self.second_log_queue.get()
+                if msg is None:
+                    break
+                if level == 'info':
+                    self.second_logger.info(msg)
+                elif level == 'warning':
+                    self.second_logger.warning(msg)
+                elif level == 'error':
+                    self.second_logger.error(msg)
+                elif level == 'debug':
+                    self.second_logger.debug(msg)
+            except queue.Empty:
+                pass
+
+    def test_log_handler(self):
+        """处理test logger的消息队列"""
+        while True:
+            try:
+                level, msg = self.test_log_queue.get()
+                if msg is None:
+                    break
+                if level == 'info':
+                    self.test_logger.info(msg)
+                elif level == 'warning':
+                    self.test_logger.warning(msg)
+                elif level == 'error':
+                    self.test_logger.error(msg)
+                elif level == 'debug':
+                    self.test_logger.debug(msg)
+            except queue.Empty:
+                pass
 
     def info(self, msg):
         self.log_queue.put(('info', msg))
@@ -1295,6 +1526,30 @@ class Log:
     
     def debug(self, msg):
         self.log_queue.put(('debug', msg))
+
+    def info_second(self, msg):
+        self.second_log_queue.put(('info', msg))
+
+    def warning_second(self, msg):
+        self.second_log_queue.put(('warning', msg))
+
+    def error_second(self, msg):
+        self.second_log_queue.put(('error', msg))
+    
+    def debug_second(self, msg):
+        self.second_log_queue.put(('debug', msg))
+    
+    def info_test(self, msg):
+        """发送info级别的消息到test logger"""
+        self.test_log_queue.put(('info', msg))
+
+    def warning_test(self, msg):
+        """发送warning级别的消息到test logger"""
+        self.test_log_queue.put(('warning', msg))
+
+    def error_test(self, msg):
+        """发送error级别的消息到test logger"""
+        self.test_log_queue.put(('error', msg))
 
 if __name__ == "__main__":
     warnings.filterwarnings("ignore")
