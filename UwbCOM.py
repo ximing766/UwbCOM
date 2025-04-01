@@ -572,38 +572,42 @@ class SerialAssistant:
         self.log.info_test(','.join(current_data) + '\n')
         messagebox.showinfo("成功", f"数据已记录到日志: {prefix}")
 
-    # 获取所有测试点到M，S的欧氏距离
     def update_test_points(self):
-        self.test_gate_width = int(self.Anchor_len.get())
-        self.test_gate_height = int(self.Anchor_H.get())
-        self.MAnchor = [self.test_gate_width/2, 0, self.test_gate_height]
-        self.SAnchor = [-self.test_gate_width/2, 0, self.test_gate_height]
-        self.test_point = {
-            **{f"A{i}": [x * (self.test_gate_width/2 if x != 0 else 1), y, 80] 
-                for i, (x, y) in enumerate(self.base_points)},
-            **{f"B{i}": [x * (self.test_gate_width/2 if x != 0 else 1), y, 150] 
-                for i, (x, y) in enumerate(self.base_points)}
-        }
-        self.point_distances = {
-            'A': {},  # A类测试点的距离
-            'B': {}   # B类测试点的距离
-        }
-        for point_name, coords in self.test_point.items():
-            m_dist = math.sqrt((coords[0] - self.MAnchor[0])**2 + 
-                                (coords[1] - self.MAnchor[1])**2 + 
-                                (coords[2] - self.MAnchor[2])**2)
-            s_dist = math.sqrt((coords[0] - self.SAnchor[0])**2 + 
-                                (coords[1] - self.SAnchor[1])**2 + 
-                                (coords[2] - self.SAnchor[2])**2)
-            
-            # 根据点名前缀(A或B)存储距离
-            point_type = point_name[0]  # 获取A或B
-            point_index = point_name[1:]  # 获取数字部分
-            self.point_distances[point_type][point_index] = {
-                'D_M': round(m_dist),
-                'D_S': round(s_dist)
+        try:
+            self.test_gate_width = int(self.Anchor_len.get())
+            self.test_gate_height = int(self.Anchor_H.get())
+            self.MAnchor = [self.test_gate_width/2, 0, self.test_gate_height]
+            self.SAnchor = [-self.test_gate_width/2, 0, self.test_gate_height]
+            self.test_point = {
+                **{f"A{i}": [x * (self.test_gate_width/2 if x != 0 else 1), y, 80] 
+                    for i, (x, y) in enumerate(self.base_points)},
+                **{f"B{i}": [x * (self.test_gate_width/2 if x != 0 else 1), y, 150] 
+                    for i, (x, y) in enumerate(self.base_points)}
             }
-        print(self.point_distances)
+            self.point_distances = {
+                'A': {},  # A类测试点的距离
+                'B': {}   # B类测试点的距离
+            }
+            for point_name, coords in self.test_point.items():
+                m_dist = math.sqrt((coords[0] - self.MAnchor[0])**2 + 
+                                    (coords[1] - self.MAnchor[1])**2 + 
+                                    (coords[2] - self.MAnchor[2])**2)
+                s_dist = math.sqrt((coords[0] - self.SAnchor[0])**2 + 
+                                    (coords[1] - self.SAnchor[1])**2 + 
+                                    (coords[2] - self.SAnchor[2])**2)
+                
+                # 根据点名前缀(A或B)存储距离
+                point_type = point_name[0]  # 获取A或B
+                point_index = point_name[1:]  # 获取数字部分
+                self.point_distances[point_type][point_index] = {
+                    'D_M': round(m_dist),
+                    'D_S': round(s_dist)
+                }
+            print(self.point_distances)
+        except ValueError as e:
+            messagebox.showerror("错误", "请输入有效的数字")
+        except Exception as e:
+            messagebox.showerror("错误", f"更新测试点失败: {str(e)}")
         
     def resource_path(self, relative_path):
         if hasattr(sys, '_MEIPASS'):
@@ -711,6 +715,7 @@ class SerialAssistant:
             self.serial_open = True
             self.update_canvas()
             self.update_Table()
+            self.update_test_points()
             self.update_Test()
             self.update_serial_button()
             self.log.add_filehandler()
@@ -753,6 +758,8 @@ class SerialAssistant:
                 if (data := self.serial.readline()):
                     data = data.decode('utf-8',errors='replace')
                     self.log.info_second(data)
+                    # 判断是否为00 00 FF开头的数据
+                    print(data)
                     if self.pos_pattern.search(data):       
                         match = re.search(r'\{.*?\}', data, re.DOTALL)        
                         try:

@@ -40,7 +40,6 @@ class UwbReaderAssistant:
         self.timeout_threshold = 0.1     #XXX 现在的写卡时间为6-700ms
         self.enter_id = 1
         self.exit_id = 1
-        self.flag = 0
         self.sequence = "06FFFFFFFFFF05FFFFFFFFFF"
 
         self.defaultKey = bytes.fromhex("32D464AC81F1640A687D023BF99E35DF")
@@ -54,7 +53,7 @@ class UwbReaderAssistant:
         self.MAC = "00000000"
         self.OnlineSeqNo = ""
         self.RandomNo = ""
-        self.halt_data_res =  "0000FF100005FFFFFFFFFF06FFFFFFFFFF44CA0000F100"
+        self.halt_data_res =  "0000FF100005FFFFFFFFFF06FFFFFFFFFF45D30000E700"
         
         if self.Use_RSCode:     #XXX  RS码使用示例:
             self.halt_data_res =  bytes([0x00, 0x00, 0xFF, 0x10, 0x00, 0x05, 0xFF, 0xFF, 0xFF, 0xFF,0xFF, 0x06, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0x44, 0xCA, 0x00, 0x00, 0xF1, 0x00])
@@ -83,13 +82,13 @@ class UwbReaderAssistant:
             Enter_Site_val = self.Site_val.get()
             if self.money_entry.get() == "":
                 self.EnterMoney = self.money_entry.get()
-                messagebox.showerror("please input enter money:")
+                messagebox.showerror("please input enter money:h")
                 return 0
             # print(f"Enter_IndustryCode: {Enter_IndustryCode_val}  Enter_Line: {Enter_Line_val}  Enter_Site: {Enter_Site_val}")
-            self.enter_read_data_res = "05FFFFFFFFFF06FFFFFFFFFF2AC20211805003020B01" + self.EnterMoney + self.posId + "0F"+ "3580DC00F030" + self.EnterEP + "0000" + self.posId \
+            self.enter_read_data_res = "05FFFFFFFFFF06FFFFFFFFFF2AD100021100805003020B01" + self.EnterMoney + self.posId + "0F"+ "350080DC00F030" + self.EnterEP + "0000" + self.posId \
                                         + Enter_IndustryCode_val + Enter_Line_val + Enter_Site_val + "000015" + self.EnterMoney + self.balance + self.DateTime + "584012215840FFFFFFFF000000000000"
             self.dcs = self.calculate_DCS(self.enter_read_data_res)
-            self.enter_read_data_res = "0000FF5700" + self.enter_read_data_res + self.dcs + "00"                #XXX 长度57为self.enter_read_data_res的长度
+            self.enter_read_data_res = "0000FF5A00" + self.enter_read_data_res + self.dcs + "00"                #XXX 长度57为self.enter_read_data_res的长度
         elif type == 1:
             Exit_IndustryCode_val = industry_code_map.get(self.IndustryCode_val1.get(), "BRT")
             Exit_Line_val = self.Line_val1.get()
@@ -99,16 +98,16 @@ class UwbReaderAssistant:
                 messagebox.showerror("please input exit money:")
                 return 0
             # print(f"Exit_IndustryCode: {Exit_IndustryCode_val}  Exit_Line: {Exit_Line_val}  Exit_Site: {Exit_Site_val}")
-            self.exit_read_data_res = "05FFFFFFFFFF06FFFFFFFFFF2AC20211805003020B01" + self.ExitMoney + self.posId + "0F"+ "3580DC00F030" + \
+            self.exit_read_data_res = "05FFFFFFFFFF06FFFFFFFFFF2AD100021100805003020B01" + self.ExitMoney + self.posId + "0F"+ "350080DC00F030" + \
                                     self.ExitEP + "0000" + self.posId + Exit_IndustryCode_val + Exit_Line_val + Exit_Site_val + "000015" + \
                                     self.ExitMoney + self.balance + self.DateTime + "584012215840FFFFFFFF000000000000"
             self.dcs = self.calculate_DCS(self.exit_read_data_res)
-            self.exit_read_data_res = "0000FF5700" + self.exit_read_data_res + self.dcs + "00"
+            self.exit_read_data_res = "0000FF5A00" + self.exit_read_data_res + self.dcs + "00"
         return 1
     
     def update_write_data_res(self):
-        self.enter_write_data_res = "05FFFFFFFFFF06FFFFFFFFFF17C20115805401000F00000001"+self.DateTime      #+self.MAC+"08"+"F500"
-        self.exit_write_data_res = "05FFFFFFFFFF06FFFFFFFFFF17C20115805401000F00000001"+self.DateTime
+        self.enter_write_data_res = "05FFFFFFFFFF06FFFFFFFFFF17D200011500805401000F00000001"+self.DateTime      #+self.MAC+"08"+"F500"
+        self.exit_write_data_res = "05FFFFFFFFFF06FFFFFFFFFF17D200011500805401000F00000001"+self.DateTime
         self.Enter_macdata = self.EnterMoney + "09" + self.posId + self.DateTime + "80" + "0000000000"     # 这里的时间需要和APDU的时间一致
         self.Enter_macdata = bytes.fromhex(self.Enter_macdata)
         self.Exit_macdata = self.ExitMoney + "09" + self.posId + self.DateTime + "80" + "0000000000"
@@ -425,7 +424,7 @@ class UwbReaderAssistant:
 
             write_data_res =write_data_res + self.MAC + "08"
             self.dcs = self.calculate_DCS(write_data_res)
-            write_data_res ="0000FF2500" + write_data_res + self.dcs + "00"
+            write_data_res ="0000FF2700" + write_data_res + self.dcs + "00"
             # print(f"write_data_res: {write_data_res}")
             if type == 0:
                 self.enter_write_data_res = write_data_res
@@ -446,14 +445,14 @@ class UwbReaderAssistant:
         DATA_POSITIONS = {
             'COMMAND'   : (index + 26, index + 28),
             'STATUS'    : (index + 28, index + 30),
-            'BALANCE'   : (index + 34, index + 42),
-            'ONLINE_SEQ': (index + 42, index + 46),
-            'RANDOM_NO' : (index + 56, index + 64),
+            'BALANCE'   : (index + 36, index + 44),
+            'ONLINE_SEQ': (index + 44, index + 48),
+            'RANDOM_NO' : (index + 58, index + 66),
             'R_APDU_NUM': (index + 54, index + 56),   #TODO 用于后续判断每个apdu是否都是9000
             'W_APDU_NUM': (index + 30, index + 32),
-            'CARD_NO'   : (index + 122, index + 142),
-            'E1'        : (index + 484, index + 486),
-            'APPLET_RES': (index + 170, index + 174),
+            'CARD_NO'   : (index + 100, index + 120),
+            'E1'        : (index + 710, index + 712),
+            'APPLET_RES': (index + 148, index + 152),
         }
         
         command = data_upper[DATA_POSITIONS['COMMAND'][0]:DATA_POSITIONS['COMMAND'][1]]
@@ -464,9 +463,8 @@ class UwbReaderAssistant:
         send_data = self.send_enter_data if is_enter else self.send_exit_data
         station_type = 0 if is_enter else 1
 
-        if command == 'C9' and status == '00':    # send 8050,80dc
+        if command == 'C1' and status == '00':    # send 8050,80dc
             r_apdu_num = int(data_upper[DATA_POSITIONS['R_APDU_NUM'][0]:DATA_POSITIONS['R_APDU_NUM'][1]],16)
-            #TODO We may check all APDU response maybe in the future.
             
             # Applet response checking
             applet_res = data_upper[DATA_POSITIONS['APPLET_RES'][0]:DATA_POSITIONS['APPLET_RES'][1]]
@@ -490,17 +488,17 @@ class UwbReaderAssistant:
             # SZT card checking
             self.CardNo = data_upper[DATA_POSITIONS['CARD_NO'][0]:DATA_POSITIONS['CARD_NO'][1]]
             print(f'CardNo = {self.CardNo}')
-            if not self.CardNo.startswith("0310487"):
-                message = "卡号格式错误,非SZT卡片"
-                self.show_in_text_area(message) if is_enter else self.show_in_text_area1(message)
-                return
+            # if not self.CardNo.startswith("0310487"):
+            #     message = "卡号格式错误,非SZT卡片"
+            #     self.show_in_text_area(message) if is_enter else self.show_in_text_area1(message)
+            #     return
 
             if self.update_read_data_res(station_type) != 0:
-                send_data(self.enter_read_data_res if is_enter else self.exit_read_data_res, 1)
                 # print(f"send {'enter' if is_enter else 'exit'} read data")
-                self.flag = 1
+                send_data(self.enter_read_data_res if is_enter else self.exit_read_data_res, 1)
+               
 
-        elif command == 'C3' and status == '00' and self.flag == 1:   #send 8054
+        elif command == 'C2' and status == '00':   #send 8054
             w_apdu_num = int(data_upper[DATA_POSITIONS['W_APDU_NUM'][0]:DATA_POSITIONS['W_APDU_NUM'][1]],16)
             # print(f"w_apdu_num: {w_apdu_num}")
             self.balance = data_upper[DATA_POSITIONS['BALANCE'][0]:DATA_POSITIONS['BALANCE'][1]]
@@ -510,14 +508,12 @@ class UwbReaderAssistant:
             if self.get_mac(self.enter_write_data_res if is_enter else self.exit_write_data_res, station_type):
                 send_data(self.enter_write_data_res if is_enter else self.exit_write_data_res, 2)
                 # print(f"send {'enter' if is_enter else 'exit'} write data")
-                self.flag += 1
 
-        elif command == 'C3' and status == '00' and self.flag == 2:   #send halt
+        elif command == 'C3' and status == '00':   #send halt
             w_apdu_num = int(data_upper[DATA_POSITIONS['W_APDU_NUM'][0]:DATA_POSITIONS['W_APDU_NUM'][1]],16)
             # print(f"w_apdu_num: {w_apdu_num}")
             # print(f"send {'enter' if is_enter else 'exit'} halt data")
             send_data(self.halt_data_res, 3)
-            self.flag = 0
 
     def read_data_enter(self):
         buffer = b''
