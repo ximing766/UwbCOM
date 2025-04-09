@@ -39,7 +39,7 @@ class SerialAssistant:
     def __init__(self, master, log):
         self.master = master
         self.log = log
-        self.version = "V1.4.6.3"
+        self.version = "V1.4.7"
         self.view = "default"                                 # view没创建为单独的类，这里只能共用一个再去区分了
         self.master.title("UwbCOM " + self.version)
         self.master.minsize(850, 835)
@@ -195,7 +195,7 @@ class SerialAssistant:
             print("previous 1s data len:",len_data)
         return wrapper
     
-    @count_1s_data
+    # @count_1s_data
     def update_Table(self):
         if self.serial_open == True:
             self.insert_data(self.table_1s_data)
@@ -216,7 +216,7 @@ class SerialAssistant:
             point_type = 'A' if self.Height_entry.get() == '0.8' else 'B'
             point_index = self.Point_entry.get()
             M_cacl = self.point_distances[point_type][point_index]['D_M']  #TODO 修改内容时，这儿读到空
-            S_cacl = self.point_distances[point_type][point_index]['D_M']
+            S_cacl = self.point_distances[point_type][point_index]['D_S']
 
             self.m_avg_var.set(f"{M_avg:.1f}")
             self.m_std_var.set(f"{M_std:.1f}")
@@ -226,6 +226,7 @@ class SerialAssistant:
             self.s_avg_var.set(f"{S_avg:.1f}")
             self.s_std_var.set(f"{S_std:.1f}")
             self.s_res_var.set(f"{S_cacl - S_avg:.1f}")
+            print(f"S_cacl={S_cacl},S_avg={S_avg}")
             self.s_res_progress['value'] = min(abs(S_cacl - S_avg), 100)
         self.master.after(1000, self.update_Test)
 
@@ -758,8 +759,6 @@ class SerialAssistant:
                 if (data := self.serial.readline()):
                     data = data.decode('utf-8',errors='replace')
                     self.log.info_second(data)
-                    # 判断是否为00 00 FF开头的数据
-                    print(data)
                     if self.pos_pattern.search(data):       
                         match = re.search(r'\{.*?\}', data, re.DOTALL)        
                         try:
