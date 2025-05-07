@@ -33,6 +33,7 @@ from Algorithm.location.Chan_lse import ChanALG_LSE
 from sklearn.preprocessing import PolynomialFeatures
 from Algorithm.location.Chan_equation import ChanEALG
 from Algorithm.location.ultdoa_dynamic_location import CoordinatePlotter
+from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 from Algorithm.lift_uwb_dynamic_detect_plan import UWBLiftAnimationPlan1,UWBLiftAnimationPlan2
 
 class SerialAssistant:
@@ -135,6 +136,7 @@ class SerialAssistant:
         self.lift_height          = 0
         self.red_height           = 0
         self.blue_height          = 250
+        self.dash_running = False
         
         self.queue_com1           = queue.Queue()           
         self.queue_com2           = queue.Queue()
@@ -197,7 +199,7 @@ class SerialAssistant:
     
     # @count_1s_data
     def update_Table(self):
-        if self.serial_open == True:
+        if self.serial_open == True and self.table_1s_data:
             self.insert_data(self.table_1s_data)
         self.master.after(1000, self.update_Table)
     
@@ -226,7 +228,7 @@ class SerialAssistant:
             self.s_avg_var.set(f"{S_avg:.1f}")
             self.s_std_var.set(f"{S_std:.1f}")
             self.s_res_var.set(f"{S_cacl - S_avg:.1f}")
-            print(f"S_cacl={S_cacl},S_avg={S_avg}")
+            # print(f"S_cacl={S_cacl},S_avg={S_avg}")
             self.s_res_progress['value'] = min(abs(S_cacl - S_avg), 100)
         self.master.after(1000, self.update_Test)
 
@@ -346,7 +348,7 @@ class SerialAssistant:
             {"text": "Distance", "command": lambda: self.on_checkbutton_click_distance(), "state": "normal"},
             {"text": "Speed", "command": lambda: self.on_checkbutton_click_speed(), "state": "normal"},
             {"text": "X-Y-Z", "command": lambda: self.on_checkbutton_click_xyz(), "state": "normal"},
-            {"text": "Reserved1", "command": None, "state": "disabled"},
+            {"text": "Dashboard", "command": lambda: self.toggle_dashboard(), "state": "normal", "bootstyle": "danger-outline"},
             {"text": "Reserved2", "command": None, "state": "disabled"},
             {"text": "Reserved3", "command": None, "state": "disabled"},
             {"text": "Reserved4", "command": None, "state": "disabled"}
@@ -461,6 +463,14 @@ class SerialAssistant:
         self.notebook.add(self.Test_frame, text='Test')
         self.Test_frame.grid_columnconfigure(0, weight=1, uniform='group1')
         self.Test_frame.grid_columnconfigure(1, weight=1, uniform='group1')
+
+        # 添加 Dashboard 页面
+        self.dashboard_frame = ttk.Frame(self.notebook)
+        self.notebook.add(self.dashboard_frame, text='Dashboard')
+        self.dashboard_frame.grid_columnconfigure(0, weight=1)
+        self.dashboard_frame.grid_columnconfigure(1, weight=1)
+        self.dashboard_frame.grid_columnconfigure(2, weight=1)
+        self.create_dashboard_widgets()
         
         # Master信息框
         master_frame = ttk.LabelFrame(self.Test_frame, text="Master Information", padding=10, bootstyle="info")
@@ -544,6 +554,108 @@ class SerialAssistant:
         '''
         others
         '''
+    
+    def create_dashboard_widgets(self):
+        """创建仪表盘页面的所有控件"""
+        # 设置最小高度，确保能显示两行图表
+        self.dashboard_frame.configure(height=400)
+
+        # 配置网格布局，设置行权重使两行平均分配空间
+        for i in range(2):  # 2行
+            self.dashboard_frame.grid_rowconfigure(i, weight=1)
+        for i in range(3):  # 3列
+            self.dashboard_frame.grid_columnconfigure(i, weight=1)
+            
+        # 创建画布用于绘制曲线
+        self.dash_canvas = {}
+        titles = ["nLos", "Speed", "D_M", "D_S", "RSSI", "---"]
+        
+        for name in ['nLos', 'Speed', 'D_M', 'D_S', 'RSSI']:
+            idx = titles.index(name)
+            row, col = divmod(idx, 3)
+            
+            figure = plt.Figure(figsize=(4, 2), constrained_layout=True)
+            ax = figure.add_subplot(111)
+            canvas = FigureCanvasTkAgg(figure, master=self.dashboard_frame)
+            widget = canvas.get_tk_widget()
+            widget.grid(row=row, column=col, padx=2, pady=2, sticky='nsew')
+            
+            # 设置图表样式
+            ax.set_title(name, pad=2, fontsize=8)
+            ax.tick_params(labelsize=6)
+            ax.grid(True, linestyle='--', alpha=0.7)
+            
+            # 添加均值和标准差的文本显示
+            stats_text = ax.text(0.02, 0.95, '', 
+                               transform=ax.transAxes,
+                               fontsize=6,
+                               verticalalignment='top',
+                               bbox=dict(boxstyle='round', facecolor='white', alpha=0.8))
+            
+            self.dash_canvas[name] = {
+                'figure': figure, 
+                'ax': ax, 
+                'canvas': canvas,
+                'stats_text': stats_text  # 保存文本对象的引用
+            }
+        
+        # 初始化数据缓存
+        self.dash_data = {
+            'nLos': deque(maxlen=100),
+            'Speed': deque(maxlen=100),
+            'D_M': deque(maxlen=100),
+            'D_S': deque(maxlen=100),
+            'RSSI': deque(maxlen=100),
+        }
+
+    def toggle_dashboard(self):
+        """切换仪表盘更新状态"""
+        self.dash_running = not self.dash_running
+        if self.dash_running:
+            self.update_dashboard()  # 重新开始更新
+
+    def update_dashboard(self):
+        """更新仪表盘数据"""
+        if not self.dash_running:
+            return
+        if self.table_1s_data:  # 如果有新数据
+            for row in self.table_1s_data:
+                # 更新数据缓存
+                self.dash_data['nLos'].append(row[1])    # nLos
+                self.dash_data['D_M'].append(row[2])     # D-Master
+                self.dash_data['D_S'].append(row[3])     # D-Slaver
+                self.dash_data['Speed'].append(row[5])   # Speed
+                self.dash_data['RSSI'].append(row[11])   # RSSI-M
+            
+            # 更新图表
+            for name, data in self.dash_data.items():
+                ax = self.dash_canvas[name]['ax']
+                ax.clear()
+                data_list = list(data)
+                ax.plot(data_list, '-')
+                
+                # 计算并显示统计信息
+                mean_val = np.mean(data_list)
+                std_val = np.std(data_list)
+                stats_text = f'Mean: {mean_val:.2f}\nStd: {std_val:.2f}'
+                
+                # 重新创建文本对象（因为ax.clear()会清除之前的文本）
+                self.dash_canvas[name]['stats_text'] = ax.text(
+                    0.02, 0.95, stats_text,
+                    transform=ax.transAxes,
+                    fontsize=6,
+                    verticalalignment='top',
+                    bbox=dict(boxstyle='round', facecolor='white', alpha=0.8)
+                )
+                
+                ax.set_title(name)
+                ax.grid(True)
+                ax.tick_params(labelsize=6)
+                self.dash_canvas[name]['canvas'].draw()
+        
+        # 每300ms更新一次
+        self.master.after(300, self.update_dashboard)
+
     def start_test_logging(self):
         prefix = self.log_name_entry.get().strip()
         if not prefix:
@@ -734,6 +846,7 @@ class SerialAssistant:
                 # self.read_thread.join()
                 # messagebox.showinfo("tips","Uart has been closed" )
                 self.Master2SlverDistance = 0    #保证重绘basic
+                self.table_1s_data = []     #放置插入上轮遗留数据
                 self.serial_open          = False
                 self.update_serial_button()
                 self.canvas.delete("all")
@@ -1437,7 +1550,7 @@ class Log:
     def add_filehandler(self):
         self.log_file_path = os.path.join(self.log_dir, f'UwbCOM_Log_{time.strftime("%Y-%m-%d-%H-%M-%S")}.csv')
         self.file_handler = logging.FileHandler(self.log_file_path)
-        self.log_format = logging.Formatter('%(asctime)s , %(levelname)s , %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
+        self.log_format = logging.Formatter('%(message)s', datefmt='%Y-%m-%d %H:%M:%S')
         self.file_handler.setFormatter(self.log_format)
         self.logger.addHandler(self.file_handler)
     

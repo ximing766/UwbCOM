@@ -19,7 +19,7 @@ from Algorithm.Ecb_Des import MyEcbDes
 class UwbReaderAssistant:
     def __init__(self, master):
         self.master = master
-        self.version = "_v1.1"
+        self.version = "_v1.0"
         self.master.title("UWBReader"+self.version)
         self.master.minsize(400, 200)
         self.master.geometry("900x450")
@@ -32,6 +32,8 @@ class UwbReaderAssistant:
         self.my_lib.encode_data.restype = None
         self.Use_RSCode  = False
         self.MyEcbDes = MyEcbDes()
+
+        self.trans_flag = 0
 
         self.EnterSerial = None
         self.ExitSerial = None
@@ -53,7 +55,7 @@ class UwbReaderAssistant:
         self.MAC = "00000000"
         self.OnlineSeqNo = ""
         self.RandomNo = ""
-        self.halt_data_res =  "0000FF100005FFFFFFFFFF06FFFFFFFFFF45D30000E700"
+        self.halt_data_res =  "0000FF100005FFFFFFFFFF06FFFFFFFFFF45C20000F800"
         
         if self.Use_RSCode:     #XXX  RS码使用示例:
             self.halt_data_res =  bytes([0x00, 0x00, 0xFF, 0x10, 0x00, 0x05, 0xFF, 0xFF, 0xFF, 0xFF,0xFF, 0x06, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0x44, 0xCA, 0x00, 0x00, 0xF1, 0x00])
@@ -85,7 +87,7 @@ class UwbReaderAssistant:
                 messagebox.showerror("please input enter money:h")
                 return 0
             # print(f"Enter_IndustryCode: {Enter_IndustryCode_val}  Enter_Line: {Enter_Line_val}  Enter_Site: {Enter_Site_val}")
-            self.enter_read_data_res = "05FFFFFFFFFF06FFFFFFFFFF2AD100021100805003020B01" + self.EnterMoney + self.posId + "0F"+ "350080DC00F030" + self.EnterEP + "0000" + self.posId \
+            self.enter_read_data_res = "05FFFFFFFFFF06FFFFFFFFFF2AC200021100805003020B01" + self.EnterMoney + self.posId + "0F"+ "350080DC00F030" + self.EnterEP + "0000" + self.posId \
                                         + Enter_IndustryCode_val + Enter_Line_val + Enter_Site_val + "000015" + self.EnterMoney + self.balance + self.DateTime + "584012215840FFFFFFFF000000000000"
             self.dcs = self.calculate_DCS(self.enter_read_data_res)
             self.enter_read_data_res = "0000FF5A00" + self.enter_read_data_res + self.dcs + "00"                #XXX 长度57为self.enter_read_data_res的长度
@@ -98,7 +100,7 @@ class UwbReaderAssistant:
                 messagebox.showerror("please input exit money:")
                 return 0
             # print(f"Exit_IndustryCode: {Exit_IndustryCode_val}  Exit_Line: {Exit_Line_val}  Exit_Site: {Exit_Site_val}")
-            self.exit_read_data_res = "05FFFFFFFFFF06FFFFFFFFFF2AD100021100805003020B01" + self.ExitMoney + self.posId + "0F"+ "350080DC00F030" + \
+            self.exit_read_data_res = "05FFFFFFFFFF06FFFFFFFFFF2AC200021100805003020B01" + self.ExitMoney + self.posId + "0F"+ "350080DC00F030" + \
                                     self.ExitEP + "0000" + self.posId + Exit_IndustryCode_val + Exit_Line_val + Exit_Site_val + "000015" + \
                                     self.ExitMoney + self.balance + self.DateTime + "584012215840FFFFFFFF000000000000"
             self.dcs = self.calculate_DCS(self.exit_read_data_res)
@@ -106,8 +108,8 @@ class UwbReaderAssistant:
         return 1
     
     def update_write_data_res(self):
-        self.enter_write_data_res = "05FFFFFFFFFF06FFFFFFFFFF17D200011500805401000F00000001"+self.DateTime      #+self.MAC+"08"+"F500"
-        self.exit_write_data_res = "05FFFFFFFFFF06FFFFFFFFFF17D200011500805401000F00000001"+self.DateTime
+        self.enter_write_data_res = "05FFFFFFFFFF06FFFFFFFFFF17C200011500805401000F00000001"+self.DateTime      #+self.MAC+"08"+"F500"
+        self.exit_write_data_res = "05FFFFFFFFFF06FFFFFFFFFF17C200011500805401000F00000001"+self.DateTime
         self.Enter_macdata = self.EnterMoney + "09" + self.posId + self.DateTime + "80" + "0000000000"     # 这里的时间需要和APDU的时间一致
         self.Enter_macdata = bytes.fromhex(self.Enter_macdata)
         self.Exit_macdata = self.ExitMoney + "09" + self.posId + self.DateTime + "80" + "0000000000"
@@ -123,14 +125,14 @@ class UwbReaderAssistant:
         self.port_var = tk.StringVar(self.master)
         self.port_var1 = tk.StringVar(self.master)
         
-        self.baudrate_var = tk.IntVar(self.master, 460800)  # 默认波特率9600
-        self.baudrate_var1 = tk.IntVar(self.master, 460800)  # 默认波特率9600
+        self.baudrate_var = tk.IntVar(self.master, 460800)  
+        self.baudrate_var1 = tk.IntVar(self.master, 460800)  
         self.font = ["Roboto", "Times New Roman", "Segoe UI"]
         def create_label(master, text, column, row, columnspan, padx, pady):
             label_style = {
                 "corner_radius": 15,
                 "fg_color": ("#E0E0E0", "#87CEEB"),
-                "font": ("Times New Roman", 20, "bold"),    # "Times New Roman"   Segoe UI  Roboto
+                "font": ("Times New Roman", 20, "bold"),    
                 "text_color": "#6A1B9A",
                 "anchor": "center"
             }
@@ -257,7 +259,7 @@ class UwbReaderAssistant:
         baudrate_frame.pack(padx=20, pady=10, fill="x")
         baudrate_label = customtkinter.CTkLabel(baudrate_frame, text="波特率选择 :", font=("Roboto", 15), text_color=TextColor)
         baudrate_label.pack(side="left", padx=(0, 10))  
-        self.baudrate_menu = customtkinter.CTkOptionMenu(baudrate_frame, variable=self.baudrate_var, values=["460800", "115200", "3000000", "9600"], font=("Roboto", 15))
+        self.baudrate_menu = customtkinter.CTkOptionMenu(baudrate_frame, variable=self.baudrate_var, values=["230400","460800", "115200", "3000000", "9600"], font=("Roboto", 15))
         self.baudrate_menu.pack(side="left")
 
         self.segemented_button = customtkinter.CTkSegmentedButton(self.EnterTab.tab("COM"), values=["Connect", "Disconnect"], command=self.segmented_button_callback, font=("Roboto", 15), width=200)
@@ -304,12 +306,13 @@ class UwbReaderAssistant:
         baudrate_frame1.pack(padx=20, pady=10, fill="x")
         baudrate_label1 = customtkinter.CTkLabel(baudrate_frame1, text="波特率选择 :", font=("Roboto", 15), text_color=TextColor)
         baudrate_label1.pack(side="left", padx=(0, 10))  
-        self.baudrate_menu1 = customtkinter.CTkOptionMenu(baudrate_frame1, variable=self.baudrate_var1, values=["460800", "115200", "3000000", "9600"], font=("Roboto", 15))
+        self.baudrate_menu1 = customtkinter.CTkOptionMenu(baudrate_frame1, variable=self.baudrate_var1, values=["230400","460800", "115200", "3000000", "9600"], font=("Roboto", 15))
         self.baudrate_menu1.pack(side="left")
 
         self.segemented_button1 = customtkinter.CTkSegmentedButton(self.ExitTab.tab("COM"), values=["Connect", "Disconnect"], command=self.segmented_button_callback1, font=("Roboto", 15), width=200)
         self.segemented_button1.pack(padx=20, pady=10, fill="x")
         self.segemented_button1.set("Disconnect")
+
     def calculate_DCS(self,hex_string):
         data = bytes.fromhex(hex_string)
         sum_bytes = sum(data)
@@ -329,6 +332,7 @@ class UwbReaderAssistant:
     def clear_text_area(self):
         self.enter_id = 1
         self.text_area.delete(1.0, tk.END)  
+
     def clear_text_area1(self):
         self.exit_id = 1
         self.text_area1.delete(1.0, tk.END)  
@@ -445,6 +449,7 @@ class UwbReaderAssistant:
         DATA_POSITIONS = {
             'COMMAND'   : (index + 26, index + 28),
             'STATUS'    : (index + 28, index + 30),
+            'APDU_NUM'  : (index + 30, index + 32),
             'BALANCE'   : (index + 36, index + 44),
             'ONLINE_SEQ': (index + 44, index + 48),
             'RANDOM_NO' : (index + 58, index + 66),
@@ -457,13 +462,13 @@ class UwbReaderAssistant:
         
         command = data_upper[DATA_POSITIONS['COMMAND'][0]:DATA_POSITIONS['COMMAND'][1]]
         status = data_upper[DATA_POSITIONS['STATUS'][0]:DATA_POSITIONS['STATUS'][1]]
+        apdu_num = int(data_upper[DATA_POSITIONS['APDU_NUM'][0]:DATA_POSITIONS['APDU_NUM'][1]],16)
         print(f"data = {data}")
         print(f'status = {status}')
         
         send_data = self.send_enter_data if is_enter else self.send_exit_data
         station_type = 0 if is_enter else 1
-
-        if command == 'C1' and status == '00':    # send 8050,80dc
+        if command == 'C2' and status == '00' and apdu_num == 10:    # send 8050,80dc
             r_apdu_num = int(data_upper[DATA_POSITIONS['R_APDU_NUM'][0]:DATA_POSITIONS['R_APDU_NUM'][1]],16)
             
             # Applet response checking
@@ -496,9 +501,8 @@ class UwbReaderAssistant:
             if self.update_read_data_res(station_type) != 0:
                 # print(f"send {'enter' if is_enter else 'exit'} read data")
                 send_data(self.enter_read_data_res if is_enter else self.exit_read_data_res, 1)
-               
-
-        elif command == 'C2' and status == '00':   #send 8054
+                 
+        elif command == 'C2' and status == '00' and apdu_num == 2:   #send 8054
             w_apdu_num = int(data_upper[DATA_POSITIONS['W_APDU_NUM'][0]:DATA_POSITIONS['W_APDU_NUM'][1]],16)
             # print(f"w_apdu_num: {w_apdu_num}")
             self.balance = data_upper[DATA_POSITIONS['BALANCE'][0]:DATA_POSITIONS['BALANCE'][1]]
@@ -509,7 +513,7 @@ class UwbReaderAssistant:
                 send_data(self.enter_write_data_res if is_enter else self.exit_write_data_res, 2)
                 # print(f"send {'enter' if is_enter else 'exit'} write data")
 
-        elif command == 'C3' and status == '00':   #send halt
+        elif command == 'C2' and status == '00' and apdu_num == 1:   #send halt
             w_apdu_num = int(data_upper[DATA_POSITIONS['W_APDU_NUM'][0]:DATA_POSITIONS['W_APDU_NUM'][1]],16)
             # print(f"w_apdu_num: {w_apdu_num}")
             # print(f"send {'enter' if is_enter else 'exit'} halt data")
