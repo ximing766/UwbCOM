@@ -21,6 +21,7 @@ class UwbReaderAssistant:
         self.master = master
         self.version = "_v1.0"
         self.master.title("UWBReader"+self.version)
+        print("UWBReader"+self.version)
         self.master.minsize(400, 200)
         self.master.geometry("900x450")
         icon_path = os.path.join(os.path.dirname(__file__), 'UWBReader.ico')
