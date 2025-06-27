@@ -15,25 +15,14 @@
 uwbenv\Scripts\activate
 ```
 
-2：执行
+2：执行auto-py-to-exe(需要安装)
 
 ```
-pyinstaller --noconsole --onefile -i UWBCOM.ico --add-data "UWBCOM.ico;." --name "UwbCOM_V1.4.5" UwbCOM.py
+auto-py-to-exe
 ```
+3：加载UwbCOM.json配置文件
 
-3：若失败，在生成的spec添加一行后执行4
-
-```
-import sys ; sys.setrecursionlimit(sys.getrecursionlimit() * 5)
-```
-
-4:使用下方命令安装
-
-```
-pyinstaller UwbCOM.spec 
-```
-
-
+4：run
 
 # 简介
 

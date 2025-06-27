@@ -500,7 +500,7 @@ class UwbReaderAssistant:
             #     return
 
             if self.update_read_data_res(station_type) != 0:
-                # print(f"send {'enter' if is_enter else 'exit'} read data")
+                print(f"send {'enter' if is_enter else 'exit'} read data")
                 send_data(self.enter_read_data_res if is_enter else self.exit_read_data_res, 1)
                  
         elif command == 'C2' and status == '00' and apdu_num == 2:   #send 8054
@@ -580,6 +580,7 @@ class UwbReaderAssistant:
                 return
             byte_data = bytes.fromhex(hex_data)
             if self.EnterSerial and self.EnterSerial.is_open:
+                print(f"EnterSerial write: {hex_data}")
                 self.EnterSerial.write(byte_data)
                 if type == 2:
                     self.enter_write_data_res = "05FFFFFFFFFF06FFFFFFFFFF17C20115805401000F00000001"+self.DateTime

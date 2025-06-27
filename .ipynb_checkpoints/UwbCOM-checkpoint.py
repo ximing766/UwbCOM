@@ -40,7 +40,7 @@ class SerialAssistant:
     def __init__(self, master, log):
         self.master = master
         self.log = log
-        self.version = "V1.5"
+        self.version = "V1.4.7"
         self.view = "default"                                 # view没创建为单独的类，这里只能共用一个再去区分了
         self.master.title("UwbCOM " + self.version)
         self.master.minsize(850, 835)
@@ -801,25 +801,14 @@ class SerialAssistant:
         
     def show_cardData(self, data):    
         data = data.strip()
-        import re
-        ansi_escape = re.compile(r'\x1b\[[0-9;]*m')
-        data = ansi_escape.sub('', data)
         try:
             json_data = json.loads(data)
             cardNumber = json_data['CardNumber']
-            
-            self.cardNo_txt.delete(0, tk.END)
-            self.cardNo_txt.insert(0, cardNumber)
-            
+            self.cardNo_txt.configure(text=cardNumber)
             balance = json_data['Balance'] / 100
-            
-            self.balance_txt.delete(0, tk.END)
-            self.balance_txt.insert(0, f"{balance:.2f}￥")
-            
+            self.balance_txt.configure(text=f"{balance:.2f}￥")
         except json.JSONDecodeError as e:
-            print(f'cardData {data}')
-            print(f'JSON解析错误: {e}')
-            pass
+            messagebox.showerror("JSON decode error:", e)   
         
     def change_filter(self,flag):
         self.Use_KF = flag
